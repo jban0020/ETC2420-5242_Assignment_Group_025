@@ -1,0 +1,36 @@
+---
+title: "Task 1: Slate Health Check"
+format:
+  html:
+    toc: true
+    number-sections: true
+execute:
+  warning: false
+  message: false
+---
+
+# Task 1: Slate Health Check
+
+## Introduction
+
+[Describe the purpose of this task.]
+
+## Data Preparation
+
+[Document data cleaning decisions and missing values.]
+
+## Summary Statistics
+
+[Insert your summary table and explanation.]
+
+## Distribution Analysis
+
+[Insert visualisations and observations.]
+
+## Changes Over Time
+
+[Insert time-based analysis and observations.]
+
+## Summary for the Head of Production
+
+[Write a 3–4 paragraph summary of your findings.]

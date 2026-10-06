@@ -1,0 +1,65 @@
+---
+title: "Meridian Pictures: Strategy and Slate Planning"
+subtitle: "ETC2420/5242 Group Assignment 2"
+author: "Group [Number]"
+date: "October 2026"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    geometry:
+      - margin=2cm
+    fontsize: 11pt
+execute:
+  warning: false
+  message: false
+---
+
+# Task 1: Slate Health Check
+
+[Insert completed and reviewed Task 1.]
+
+# Task 2: Franchise vs. Original: Investment Strategy
+
+[Insert completed and reviewed Task 2.]
+
+# Task 3: Modelling Budgets and Downside Risk
+
+[Insert completed and reviewed Task 3.]
+
+# Task 4: Building a Greenlight Risk Model
+
+[Insert completed and reviewed Task 4.]
+
+# Appendix: Group Collaboration
+
+## Group Information
+
+**Team 025**
+
+**Group Members**
+
+- Joshua Bannon
+- Vikash Manoj
+- Shakshi Shah
+- Smit Tambat
+
+## Task Allocation
+
+[Insert task allocation and reviewer table.]
+
+## Meeting Schedule
+
+[Record meeting dates, participants and objectives.]
+
+## Contribution Summary
+
+[Document each member's contributions.]
+
+## Cross-Review
+
+[Record reviewers and feedback for each task.]
+
+## Reproducibility
+
+[Document how the final report was checked.]

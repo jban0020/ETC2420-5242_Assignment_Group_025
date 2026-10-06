@@ -1,0 +1,44 @@
+---
+title: "Task 4: Building a Greenlight Risk Model"
+format:
+  html:
+    toc: true
+    number-sections: true
+execute:
+  warning: false
+  message: false
+---
+
+# Task 4: Building a Greenlight Risk Model
+
+## Introduction
+
+[Explain the purpose of the model.]
+
+## Outcome and Predictor Definitions
+
+[Document variables and modelling choices.]
+
+## Frequentist Logistic Regression
+
+[Insert analysis and interpretation.]
+
+## Bayesian Logistic Regression
+
+[Insert analysis and interpretation.]
+
+## Model Comparison
+
+[Compare relevant model estimates and intervals.]
+
+## Classification Performance
+
+[Insert confusion matrix and evaluation metrics.]
+
+## Hypothetical Film Pitches
+
+[Document pitch scenarios and predictions.]
+
+## Summary for the Head of Production
+
+[Summarise the model's uses and limitations.]

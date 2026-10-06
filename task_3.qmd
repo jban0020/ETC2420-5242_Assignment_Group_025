@@ -1,0 +1,36 @@
+---
+title: "Task 3: Modelling Budgets and Downside Risk"
+format:
+  html:
+    toc: true
+    number-sections: true
+execute:
+  warning: false
+  message: false
+---
+
+# Task 3: Modelling Budgets and Downside Risk
+
+## Introduction
+
+[Explain the two financial planning questions.]
+
+## Universal Pictures Budget Modelling
+
+[Document the distributions considered.]
+
+## Model Diagnostics and Comparison
+
+[Insert diagnostics, AIC comparisons and discussion.]
+
+## Action Genre Downside Risk
+
+[Document your percentile estimation methods.]
+
+## Comparison of Interval Estimates
+
+[Compare methods, assumptions and findings.]
+
+## Summary for the Finance Team
+
+[Summarise the implications in plain language.]

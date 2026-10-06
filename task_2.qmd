@@ -1,0 +1,32 @@
+---
+title: "Task 2: Franchise vs. Original: Investment Strategy"
+format:
+  html:
+    toc: true
+    number-sections: true
+execute:
+  warning: false
+  message: false
+---
+
+# Task 2: Franchise vs. Original: Investment Strategy
+
+## Introduction
+
+[Describe the investment strategy question.]
+
+## Budget Distribution Comparison
+
+[Insert your visualisation and observations.]
+
+## Interval Estimation
+
+[Document your method and interval estimate.]
+
+## Discussion
+
+[Discuss the implications of your findings.]
+
+## Investment Strategy Recommendations
+
+[Write your recommendations for Meridian.]
