@@ -169,3 +169,34 @@ ggplot(
   )
 ```
 
+## Overall ROI Distribution
+
+```{r}
+#| label: fig-roi-distribution
+#| fig-cap: "Distribution of ROI on a logarithmic scale."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_clean |> filter(!is.na(roi), roi > 0),
+  aes(x = roi)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#269C8C",
+    colour = "white"
+  ) +
+  geom_vline(
+    xintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  scale_x_log10(
+    labels = scales::label_number()
+  ) +
+  labs(
+    x = "ROI (revenue / budget, log scale)",
+    y = "Number of films"
+  )
+```
+
