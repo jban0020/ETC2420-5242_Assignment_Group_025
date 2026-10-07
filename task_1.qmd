@@ -142,3 +142,30 @@ kable(
   caption = "Franchise and Original film composition"
 )
 ```
+
+## Overall Budget Distribution
+
+```{r}
+#| label: fig-budget-distribution
+#| fig-cap: "Distribution of reported production budgets."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_clean |> filter(!is.na(budget_m)),
+  aes(x = budget_m)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#3478A8",
+    colour = "white"
+  ) +
+  scale_x_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Production budget (USD millions)",
+    y = "Number of films"
+  )
+```
+
