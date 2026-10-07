@@ -127,3 +127,18 @@ knitr::kable(
   caption = "Summary statistics for production budgets and ROI"
 )
 ```
+
+```{r}
+#| label: task1-franchise-summary
+
+franchise_summary <- movies_clean |>
+  count(franchise_status, name = "Films") |>
+  mutate(
+    Percentage = round(100 * Films / sum(Films), 1)
+  )
+
+kable(
+  franchise_summary,
+  caption = "Franchise and Original film composition"
+)
+```
