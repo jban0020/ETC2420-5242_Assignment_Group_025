@@ -200,3 +200,34 @@ ggplot(
   )
 ```
 
+## Franchise Composition
+
+```{r}
+#| label: fig-franchise-composition
+#| fig-cap: "Proportion of Franchise and Original films."
+#| fig-width: 6
+#| fig-height: 4
+
+ggplot(
+  franchise_summary,
+  aes(x = franchise_status,
+      y = Films,
+      fill = franchise_status)
+) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(Percentage, "%")),
+    vjust = -0.5
+  ) +
+  scale_fill_manual(
+    values = c("Original" = "#3478A8",
+               "Franchise" = "#E59B46")
+  ) +
+  labs(
+    x = "Film classification",
+    y = "Number of films"
+  ) +
+  guides(fill = "none") +
+  expand_limits(y = max(franchise_summary$Films) * 1.1)
+```
+
