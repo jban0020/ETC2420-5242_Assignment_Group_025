@@ -56,3 +56,32 @@ movies_clean <- movies |>
 movies_focus <- movies_clean |>
   filter(primary_genre %in% focus_genres)
 ```
+
+## Data Quality Assessment
+
+```{r}
+#| label: task1-data-quality
+
+data_quality <- tibble(
+  Measure = c(
+    "Films in original dataset",
+    "Films in analysis period",
+    "Missing or invalid budgets",
+    "Missing or invalid revenues",
+    "Missing ROI values",
+    "Films with valid budget and ROI"
+  ),
+  Count = c(
+    nrow(movies),
+    nrow(movies_clean),
+    sum(is.na(movies_clean$budget)),
+    sum(is.na(movies_clean$revenue)),
+    sum(is.na(movies_clean$roi)),
+    sum(complete.cases(
+      movies_clean[, c("budget", "roi")]
+    ))
+  )
+)
+
+kable(data_quality, caption = "Data quality summary")
+```
