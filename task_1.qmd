@@ -324,3 +324,117 @@ ggplot(
     fill = "Film classification"
   )
 ```
+
+## Changes in Budgets Over Time
+
+```{r}
+#| label: fig-budget-trend
+#| fig-cap: "Median production budget by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+budget_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_budget = median(budget_m, na.rm = TRUE),
+    n_valid = sum(!is.na(budget_m)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+ggplot(
+  budget_trend,
+  aes(x = release_year, y = median_budget)
+) +
+  geom_line(colour = "#3478A8", linewidth = 1) +
+  geom_point(colour = "#3478A8", size = 1.5) +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median production budget (USD millions)"
+  )
+```
+
+## Changes in ROI Over Time
+
+```{r}
+#| label: fig-roi-trend
+#| fig-cap: "Median ROI by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+roi_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_roi = median(roi, na.rm = TRUE),
+    n_valid = sum(!is.na(roi)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+ggplot(
+  roi_trend,
+  aes(x = release_year, y = median_roi)
+) +
+  geom_line(colour = "#269C8C", linewidth = 1) +
+  geom_point(colour = "#269C8C", size = 1.5) +
+  geom_hline(
+    yintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median ROI (multiple)"
+  )
+```
+
+## Franchise Composition Over Time
+
+```{r}
+#| label: fig-franchise-trend
+#| fig-cap: "Franchise and Original composition by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+franchise_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  count(release_year, franchise_status) |>
+  group_by(release_year) |>
+  mutate(
+    percentage = n / sum(n)
+  ) |>
+  ungroup()
+
+ggplot(
+  franchise_trend,
+  aes(
+    x = release_year,
+    y = percentage,
+    fill = franchise_status
+  )
+) +
+  geom_col(width = 0.9) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Release year",
+    y = "Percentage of films",
+    fill = "Film classification"
+  )
+```
+
+## Summary for the Head of Production
+
+Write a brief summary (3 - 4 paragraphs max) for the Head of Production, including the key details that can be observed about these variables. Note any data quality issues (e.g. missing or placeholder values) you had to address first.
