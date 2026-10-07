@@ -13,24 +13,433 @@ execute:
 
 ## Introduction
 
-[Describe the purpose of this task.]
+## Data Preparation
 
 ## Data Preparation
 
-[Document data cleaning decisions and missing values.]
+```{r}
+#| label: task1-setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 11))
+
+focus_genres <- c(
+  "Action", "Comedy", "Drama",
+  "Horror", "Animation"
+)
+
+movies <- read_csv("data/movies.csv",
+                   show_col_types = FALSE)
+
+movies_clean <- movies |>
+  filter(!is.na(release_year),
+         release_year <= 2016) |>
+  mutate(
+    budget = if_else(budget < 10000, NA_real_, 
+                     as.numeric(budget)),
+    revenue = if_else(revenue <= 0, NA_real_,
+                      as.numeric(revenue)),
+    roi = if_else(
+      !is.na(budget) & !is.na(revenue),
+      revenue / budget,
+      NA_real_
+    ),
+    budget_m = budget / 1e6,
+    franchise_status = factor(
+      franchise_status,
+      levels = c("Original", "Franchise")
+    )
+  )
+
+movies_focus <- movies_clean |>
+  filter(primary_genre %in% focus_genres)
+```
+
+The analysis excludes films released after 2016, treats budgets below $10,000 and zero revenue as missing, and recalculates ROI using valid financial observations. Each film is assigned to its first-listed (`primary_genre`) genre to avoid counting the same film multiple times.
+
+## Data Quality Assessment
+
+```{r}
+#| label: task1-data-quality
+
+data_quality <- tibble(
+  Measure = c(
+    "Films in original dataset",
+    "Films in analysis period",
+    "Missing or invalid budgets",
+    "Missing or invalid revenues",
+    "Missing ROI values",
+    "Films with valid budget and ROI"
+  ),
+  Count = c(
+    nrow(movies),
+    nrow(movies_clean),
+    sum(is.na(movies_clean$budget)),
+    sum(is.na(movies_clean$revenue)),
+    sum(is.na(movies_clean$roi)),
+    sum(complete.cases(
+      movies_clean[, c("budget", "roi")]
+    ))
+  )
+)
+
+kable(data_quality, caption = "Data quality summary")
+```
 
 ## Summary Statistics
 
-[Insert your summary table and explanation.]
+```{r}
+#| label: task1-summary-table
 
-## Distribution Analysis
+financial_summary <- tibble(
+  Variable = c("Production budget ($m)", "ROI (multiple)"),
+  N = c(
+    sum(!is.na(movies_clean$budget)),
+    sum(!is.na(movies_clean$roi))
+  ),
+  Mean = c(
+    mean(movies_clean$budget_m, na.rm = TRUE),
+    mean(movies_clean$roi, na.rm = TRUE)
+  ),
+  Median = c(
+    median(movies_clean$budget_m, na.rm = TRUE),
+    median(movies_clean$roi, na.rm = TRUE)
+  ),
+  SD = c(
+    sd(movies_clean$budget_m, na.rm = TRUE),
+    sd(movies_clean$roi, na.rm = TRUE)
+  ),
+  Q1 = c(
+    quantile(movies_clean$budget_m, 0.25, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.25, na.rm = TRUE)
+  ),
+  Q3 = c(
+    quantile(movies_clean$budget_m, 0.75, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.75, na.rm = TRUE)
+  )
+) |>
+  mutate(
+    across(Mean:Q3, ~round(.x, 2))
+  )
 
-[Insert visualisations and observations.]
+knitr::kable(
+  financial_summary,
+  caption = "Summary statistics for production budgets and ROI"
+)
+```
 
-## Changes Over Time
+```{r}
+#| label: task1-franchise-summary
 
-[Insert time-based analysis and observations.]
+franchise_summary <- movies_clean |>
+  count(franchise_status, name = "Films") |>
+  mutate(
+    Percentage = round(100 * Films / sum(Films), 1)
+  )
+
+kable(
+  franchise_summary,
+  caption = "Franchise and Original film composition"
+)
+```
+
+## Overall Budget Distribution
+
+```{r}
+#| label: fig-budget-distribution
+#| fig-cap: "Distribution of reported production budgets."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_clean |> filter(!is.na(budget_m)),
+  aes(x = budget_m)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#3478A8",
+    colour = "white"
+  ) +
+  scale_x_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Production budget (USD millions)",
+    y = "Number of films"
+  )
+```
+
+## Overall ROI Distribution
+
+```{r}
+#| label: fig-roi-distribution
+#| fig-cap: "Distribution of ROI on a logarithmic scale."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_clean |> filter(!is.na(roi), roi > 0),
+  aes(x = roi)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#269C8C",
+    colour = "white"
+  ) +
+  geom_vline(
+    xintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  scale_x_log10(
+    labels = scales::label_number()
+  ) +
+  labs(
+    x = "ROI (revenue / budget, log scale)",
+    y = "Number of films"
+  )
+```
+
+The logarithmic scale makes the highly skewed ROI distribution easier to interpret. The dashed line marks ROI = 1, where reported box-office revenue equals production budget. Films with ROI = 0 are not displayed on the logarithmic scale.
+
+## Franchise Composition
+
+```{r}
+#| label: fig-franchise-composition
+#| fig-cap: "Proportion of Franchise and Original films."
+#| fig-width: 6
+#| fig-height: 4
+
+ggplot(
+  franchise_summary,
+  aes(x = franchise_status,
+      y = Films,
+      fill = franchise_status)
+) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(Percentage, "%")),
+    vjust = -0.5
+  ) +
+  scale_fill_manual(
+    values = c("Original" = "#3478A8",
+               "Franchise" = "#E59B46")
+  ) +
+  labs(
+    x = "Film classification",
+    y = "Number of films"
+  ) +
+  guides(fill = "none") +
+  expand_limits(y = max(franchise_summary$Films) * 1.1)
+```
+
+## Production Budgets Across Genres
+
+```{r}
+#| label: fig-budget-genre
+#| fig-cap: "Production budget distributions across the five focus genres."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus |> filter(!is.na(budget_m)),
+  aes(
+    x = reorder(primary_genre, budget_m,
+                FUN = median),
+    y = budget_m,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Production budget (USD millions)"
+  )
+```
+
+## ROI Across Genres
+
+```{r}
+#| label: fig-roi-genre
+#| fig-cap: "ROI distributions across the five focus genres."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus |> filter(!is.na(roi), roi > 0),
+  aes(
+    x = reorder(primary_genre, roi, FUN = median),
+    y = roi,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_log10() +
+  labs(
+    x = "Primary genre",
+    y = "ROI (multiple, log scale)"
+  )
+```
+
+## Franchise Composition Across Genres
+
+```{r}
+#| label: fig-franchise-genre
+#| fig-cap: "Franchise and Original composition by primary genre."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus,
+  aes(
+    x = primary_genre,
+    fill = franchise_status
+  )
+) +
+  geom_bar(
+    position = "fill",
+    width = 0.7
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Percentage of films",
+    fill = "Film classification"
+  )
+```
+
+## Changes in Budgets Over Time
+
+```{r}
+#| label: fig-budget-trend
+#| fig-cap: "Median production budget by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+budget_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_budget = median(budget_m, na.rm = TRUE),
+    n_valid = sum(!is.na(budget_m)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+ggplot(
+  budget_trend,
+  aes(x = release_year, y = median_budget)
+) +
+  geom_line(colour = "#3478A8", linewidth = 1) +
+  geom_point(colour = "#3478A8", size = 1.5) +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median production budget (USD millions)"
+  )
+```
+
+## Changes in ROI Over Time
+
+```{r}
+#| label: fig-roi-trend
+#| fig-cap: "Median ROI by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+roi_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_roi = median(roi, na.rm = TRUE),
+    n_valid = sum(!is.na(roi)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+ggplot(
+  roi_trend,
+  aes(x = release_year, y = median_roi)
+) +
+  geom_line(colour = "#269C8C", linewidth = 1) +
+  geom_point(colour = "#269C8C", size = 1.5) +
+  geom_hline(
+    yintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median ROI (multiple)"
+  )
+```
+
+## Franchise Composition Over Time
+
+```{r}
+#| label: fig-franchise-trend
+#| fig-cap: "Franchise and Original composition by release year, 1990–2016."
+#| fig-width: 7
+#| fig-height: 4
+
+franchise_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  count(release_year, franchise_status) |>
+  group_by(release_year) |>
+  mutate(
+    percentage = n / sum(n)
+  ) |>
+  ungroup()
+
+ggplot(
+  franchise_trend,
+  aes(
+    x = release_year,
+    y = percentage,
+    fill = franchise_status
+  )
+) +
+  geom_col(width = 0.9) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Release year",
+    y = "Percentage of films",
+    fill = "Film classification"
+  )
+```
 
 ## Summary for the Head of Production
 
-[Write a 3–4 paragraph summary of your findings.]
+Write a brief summary (3 - 4 paragraphs max) for the Head of Production, including the key details that can be observed about these variables. Note any data quality issues (e.g. missing or placeholder values) you had to address first.
