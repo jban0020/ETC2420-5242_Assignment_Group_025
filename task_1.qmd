@@ -231,3 +231,34 @@ ggplot(
   expand_limits(y = max(franchise_summary$Films) * 1.1)
 ```
 
+## Production Budgets Across Genres
+
+```{r}
+#| label: fig-budget-genre
+#| fig-cap: "Production budget distributions across the five focus genres."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus |> filter(!is.na(budget_m)),
+  aes(
+    x = reorder(primary_genre, budget_m,
+                FUN = median),
+    y = budget_m,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Production budget (USD millions)"
+  )
+```
+
