@@ -262,3 +262,65 @@ ggplot(
   )
 ```
 
+## ROI Across Genres
+
+```{r}
+#| label: fig-roi-genre
+#| fig-cap: "ROI distributions across the five focus genres."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus |> filter(!is.na(roi), roi > 0),
+  aes(
+    x = reorder(primary_genre, roi, FUN = median),
+    y = roi,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_log10() +
+  labs(
+    x = "Primary genre",
+    y = "ROI (multiple, log scale)"
+  )
+```
+
+## Franchise Composition Across Genres
+
+```{r}
+#| label: fig-franchise-genre
+#| fig-cap: "Franchise and Original composition by primary genre."
+#| fig-width: 7
+#| fig-height: 4
+
+ggplot(
+  movies_focus,
+  aes(
+    x = primary_genre,
+    fill = franchise_status
+  )
+) +
+  geom_bar(
+    position = "fill",
+    width = 0.7
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Percentage of films",
+    fill = "Film classification"
+  )
+```
