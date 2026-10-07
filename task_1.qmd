@@ -57,6 +57,8 @@ movies_focus <- movies_clean |>
   filter(primary_genre %in% focus_genres)
 ```
 
+The analysis excludes films released after 2016, treats budgets below $10,000 and zero revenue as missing, and recalculates ROI using valid financial observations. Each film is assigned to its first-listed (`primary_genre`) genre to avoid counting the same film multiple times.
+
 ## Data Quality Assessment
 
 ```{r}
@@ -199,6 +201,8 @@ ggplot(
     y = "Number of films"
   )
 ```
+
+The logarithmic scale makes the highly skewed ROI distribution easier to interpret. The dashed line marks ROI = 1, where reported box-office revenue equals production budget. Films with ROI = 0 are not displayed on the logarithmic scale.
 
 ## Franchise Composition
 
