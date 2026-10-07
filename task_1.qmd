@@ -85,3 +85,45 @@ data_quality <- tibble(
 
 kable(data_quality, caption = "Data quality summary")
 ```
+
+## Summary Statistics
+
+```{r}
+#| label: task1-summary-table
+
+financial_summary <- tibble(
+  Variable = c("Production budget ($m)", "ROI (multiple)"),
+  N = c(
+    sum(!is.na(movies_clean$budget)),
+    sum(!is.na(movies_clean$roi))
+  ),
+  Mean = c(
+    mean(movies_clean$budget_m, na.rm = TRUE),
+    mean(movies_clean$roi, na.rm = TRUE)
+  ),
+  Median = c(
+    median(movies_clean$budget_m, na.rm = TRUE),
+    median(movies_clean$roi, na.rm = TRUE)
+  ),
+  SD = c(
+    sd(movies_clean$budget_m, na.rm = TRUE),
+    sd(movies_clean$roi, na.rm = TRUE)
+  ),
+  Q1 = c(
+    quantile(movies_clean$budget_m, 0.25, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.25, na.rm = TRUE)
+  ),
+  Q3 = c(
+    quantile(movies_clean$budget_m, 0.75, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.75, na.rm = TRUE)
+  )
+) |>
+  mutate(
+    across(Mean:Q3, ~round(.x, 2))
+  )
+
+knitr::kable(
+  financial_summary,
+  caption = "Summary statistics for production budgets and ROI"
+)
+```
