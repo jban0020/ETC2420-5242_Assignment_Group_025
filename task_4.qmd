@@ -11,6 +11,50 @@ execute:
 
 # Task 4: Building a Greenlight Risk Model
 
+## Data Preparation
+
+```{r}
+#| label: task1-setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 11))
+
+focus_genres <- c(
+  "Action", "Comedy", "Drama",
+  "Horror", "Animation"
+)
+
+movies <- read_csv("data/movies.csv",
+                   show_col_types = FALSE)
+
+movies_clean <- movies |>
+  filter(!is.na(release_year),
+         release_year <= 2016) |>
+  mutate(
+    budget = if_else(budget < 10000, NA_real_, 
+                     as.numeric(budget)),
+    revenue = if_else(revenue <= 0, NA_real_,
+                      as.numeric(revenue)),
+    roi = if_else(
+      !is.na(budget) & !is.na(revenue),
+      revenue / budget,
+      NA_real_
+    ),
+    budget_m = budget / 1e6,
+    franchise_status = factor(
+      franchise_status,
+      levels = c("Original", "Franchise")
+    )
+  )
+
+movies_focus <- movies_clean |>
+  filter(primary_genre %in% focus_genres)
+```
+
+
 ## Introduction
 
 [Explain the purpose of the model.]
