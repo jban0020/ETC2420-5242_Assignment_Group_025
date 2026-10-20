@@ -60,7 +60,39 @@ movies_clean <- movies |>
 
 ## Budget Distribution Comparison
 
-\[Insert your visualisation and observations.\]
+```{r}
+#| label: fig-task2-budget-comparison
+#| fig-cap: "Production budget distributions for Original and Franchise films."
+#| fig-width: 7
+#| fig-height: 5
+
+ggplot(
+  movies_clean |>
+    filter(
+      !is.na(budget_m),
+      budget_m > 0,
+      !is.na(franchise_status)
+    ),
+  aes(
+    x = franchise_status,
+    y = budget_m,
+    fill = franchise_status
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  scale_y_log10(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Film classification",
+    y = "Production budget (USD millions)"
+  )
+```
+
+The boxplots suggest that Franchise films generally have higher production budgets than Original films, as shown by the higher median budget. The Franchise group also has a wider interquartile range on the displayed logarithmic scale, indicating greater variation in the middle 50% of its budgets on a multiplicative scale. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in that group. However, the distributions overlap, so the difference is not absolute: some Original films have budgets comparable to those of Franchise films. These visual findings will be assessed further using a confidence interval for the difference in median budgets.
 
 ## Interval Estimation
 
