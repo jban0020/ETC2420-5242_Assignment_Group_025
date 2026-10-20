@@ -11,17 +11,243 @@ execute:
 
 # Task 4: Building a Greenlight Risk Model
 
+## Data Preparation
+
+```{r}
+#| label: task1-setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 11))
+
+focus_genres <- c(
+  "Action", "Comedy", "Drama",
+  "Horror", "Animation"
+)
+
+movies <- read_csv("data/movies.csv",
+                   show_col_types = FALSE)
+
+movies_clean <- movies |>
+  filter(!is.na(release_year),
+         release_year <= 2016) |>
+  mutate(
+    budget = if_else(budget < 10000, NA_real_, 
+                     as.numeric(budget)),
+    revenue = if_else(revenue <= 0, NA_real_,
+                      as.numeric(revenue)),
+    roi = if_else(
+      !is.na(budget) & !is.na(revenue),
+      revenue / budget,
+      NA_real_
+    ),
+    budget_m = budget / 1e6,
+    franchise_status = factor(
+      franchise_status,
+      levels = c("Original", "Franchise")
+    )
+  )
+
+movies_focus <- movies_clean |>
+  filter(primary_genre %in% focus_genres)
+```
+
+
 ## Introduction
 
 [Explain the purpose of the model.]
 
 ## Outcome and Predictor Definitions
 
-[Document variables and modelling choices.]
+```{r}
+#| label: task4-outcome
+#| include: false
+
+# movies_clean was created in the shared setup chunk.
+
+task4_data <- movies_clean |>
+  mutate(
+    flop = case_when(
+      is.na(roi) ~ NA_integer_,
+      roi < 1 ~ 1L,
+      TRUE ~ 0L      
+    )
+  )
+
+# Check the outcome categories.
+task4_data |>
+  count(flop, name = "number_of_films")
+```
+
+```{r}
+#| label: task4-data-checks
+#| include: false
+
+# Check missing values in the selected predictors.
+task4_data |>
+  summarise(
+    missing_genre = sum(is.na(primary_genre)),
+    missing_franchise = sum(is.na(franchise_status)),
+    missing_budget = sum(is.na(budget_m)),
+    missing_crew = sum(is.na(crew_size))
+  )
+
+# Count films with complete information for modelling.
+task4_data |>
+  summarise(
+    complete_model_cases = sum(
+      complete.cases(
+        flop,
+        primary_genre,
+        franchise_status,
+        budget_m,
+        crew_size
+      )
+    )
+  )
+```
+
+Financial risk was assessed using return on investment (ROI), calculated as box-office revenue divided by production budget. A film was classified as a *flop* when its ROI was below 1, indicating that reported revenue did not recover the production budget. Films with an ROI of 1 or higher were classified as *non-flops*, while those with missing ROI were left unclassified.
+
+Of the 4,801 films examined, 785 were identified as flops and 2,429 as non-flops, with the remaining 1,587 lacking sufficient financial information for classification. Among the 3,214 films with known outcomes, the observed flop rate was approximately 24.4%.
+
+Logistic regression was selected because the outcome is binary, allowing the model to estimate the probability of a film flopping while keeping predicted values between 0 and 1. Linear regression is less appropriate because its predictions are not restricted to this range, whereas Poisson regression is primarily designed for count outcomes rather than binary classifications.
+
+The proposed predictors were primary genre, franchise status, production budget and crew size, as these characteristics can reasonably be considered before a film receives production approval. After accounting for missing outcome and predictor information, 3,213 films had complete observations available for modelling. However, the substantial amount of missing financial data remains an important limitation, as films with recorded outcomes may not be representative of the wider dataset, potentially introducing selection bias.
 
 ## Frequentist Logistic Regression
 
-[Insert analysis and interpretation.]
+```{r}
+#| label: task4-initial-model
+#| include: false
+
+task4_initial_model <- glm(
+  flop ~ primary_genre + franchise_status + budget_m + crew_size,
+  data = task4_data,
+  family = binomial
+)
+
+summary(task4_initial_model)
+```
+
+```{r}
+#| label: task4-genre-diagnostic
+#| include: false
+
+task4_data |>
+  filter(!is.na(flop), !is.na(primary_genre)) |>
+  count(primary_genre, flop) |>
+  tidyr::pivot_wider(
+    names_from = flop,
+    values_from = n,
+    values_fill = 0,
+    names_prefix = "flop_"
+  ) |>
+  mutate(total = flop_0 + flop_1) |>
+  arrange(total)
+```
+
+```{r}
+#| label: task4-model-data
+#| include: false
+
+task4_model_data <- task4_data |>
+  mutate(
+    budget_10m = budget_m / 10,
+    crew_10 = crew_size / 10
+  ) |>
+  filter(
+    complete.cases(
+      flop,
+      primary_genre,
+      franchise_status,
+      budget_10m,
+      crew_10
+    )
+  )
+```
+
+```{r}
+#| label: task4-frequentist-model
+#| include: false
+
+task4_frequentist <- glm(
+  flop ~ primary_genre + franchise_status + budget_10m + crew_10,
+  data = task4_model_data,
+  family = binomial
+)
+
+summary(task4_frequentist)
+```
+
+```{r}
+#| label: task4-frequentist-odds
+#| include: false
+
+odds_ratios <- exp(coef(task4_frequentist))
+
+wald_intervals <- confint.default(task4_frequentist)
+
+task4_odds_table <- data.frame(
+  Predictor = names(odds_ratios),
+  Odds_Ratio = odds_ratios,
+  CI_Lower = exp(wald_intervals[, 1]),
+  CI_Upper = exp(wald_intervals[, 2])
+)
+
+task4_odds_table |>
+  dplyr::mutate(
+    dplyr::across(
+      c(Odds_Ratio, CI_Lower, CI_Upper),
+      ~ round(.x, 3)
+    )
+  ) |>
+  print(row.names = FALSE)
+```
+
+```{r}
+#| label: task4-frequentist-results
+#| echo: false
+
+task4_odds_table |>
+  dplyr::filter(
+    Predictor %in% c(
+      "franchise_statusFranchise",
+      "budget_10m",
+      "crew_10"
+    )
+  ) |>
+  dplyr::mutate(
+    Predictor = dplyr::recode(
+      Predictor,
+      franchise_statusFranchise = "Franchise (vs original)",
+      budget_10m = "Budget (+$10 million)",
+      crew_10 = "Crew (+10 members)"
+    ),
+    dplyr::across(
+      c(Odds_Ratio, CI_Lower, CI_Upper),
+      ~ round(.x, 3)
+    )
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Predictor",
+      "Odds ratio",
+      "95% CI lower",
+      "95% CI upper"
+    ),
+    caption = "Selected frequentist logistic regression results"
+  )
+```
+### Interpretation of Model Results
+
+The results suggest that franchise films have approximately **77.6% lower odds of flopping** than original films, after accounting for genre, budget and crew size. A further $10 million in budget is associated with around 4% lower flop odds, while an additional 10 crew members corresponds to a 9.4% reduction in estimated odds. Although these patterns highlight factors associated with commercial performance, they should not be interpreted as causal relationships or equivalent changes in flop probability.
+
+### Model Limitations
+
+The model was fitted using **3,213 films with complete information** for the selected variables. One concern is the Foreign genre, which contains only one film with a recorded outcome. This creates complete separation, making its coefficient highly unstable and unsuitable for reliable decision-making. Additionally, missing financial information may affect how well the analysed films represent the wider dataset. These limitations should be considered when using the model to assess future film proposals.
 
 ## Bayesian Logistic Regression
 
