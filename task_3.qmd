@@ -91,7 +91,147 @@ universal_weibull <- fitdistr(
 
 ## Model Diagnostics and Comparison
 
-[Insert diagnostics, AIC comparisons and discussion.]
+```{r}
+#| label: tbl-task3-aic
+#| tbl-cap: "Distributions fitted to Universal Pictures budgets, ordered by AIC (lowest first)"
+#| tbl-cap-location: top
+
+universal_comparison <- tibble(
+  model = c(
+    "Normal",
+    "Gamma",
+    "Log-normal",
+    "Weibull"
+  ),
+  parameters = c(
+    "mean, sd ($m)",
+    "shape, rate (per $m)",
+    "meanlog, sdlog (log $m)",
+    "shape, scale ($m)"
+  ),
+  estimate_1 = c(
+    universal_normal$estimate["mean"],
+    universal_gamma$estimate["shape"],
+    universal_lognormal$estimate["meanlog"],
+    universal_weibull$estimate["shape"]
+  ),
+  estimate_2 = c(
+    universal_normal$estimate["sd"],
+    universal_gamma$estimate["rate"],
+    universal_lognormal$estimate["sdlog"],
+    universal_weibull$estimate["scale"]
+  ),
+  log_likelihood = c(
+    universal_normal$loglik,
+    universal_gamma$loglik,
+    universal_lognormal$loglik,
+    universal_weibull$loglik
+  ),
+  aic = c(
+    AIC(universal_normal),
+    AIC(universal_gamma),
+    AIC(universal_lognormal),
+    AIC(universal_weibull)
+  )
+) |>
+  arrange(desc(log_likelihood))
+
+universal_comparison |>
+  gt() |>
+  cols_label(
+    model = "Distribution",
+    parameters = "Parameters (units)",
+    estimate_1 = "Estimate 1",
+    estimate_2 = "Estimate 2",
+    log_likelihood = "Log-likelihood",
+    aic = "AIC"
+  ) |>
+  fmt_number(
+    columns = c(estimate_1, estimate_2),
+    decimals = 3
+  ) |>
+  fmt_number(
+    columns = c(log_likelihood, aic),
+    decimals = 1
+  )
+```
+
+```{r}
+#| label: fig-task3-qq
+#| fig-cap: "Q-Q plots of Universal Pictures budgets against each fitted distribution. Points close to the line indicate a good fit."
+#| fig-width: 7
+#| fig-height: 5
+
+qq_normal <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qnorm,
+    dparams = as.list(universal_normal$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qnorm,
+    dparams = as.list(universal_normal$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Normal"
+  ) +
+  theme_minimal()
+
+qq_gamma <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qgamma,
+    dparams = as.list(universal_gamma$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qgamma,
+    dparams = as.list(universal_gamma$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Gamma"
+  ) +
+  theme_minimal()
+
+qq_lognormal <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qlnorm,
+    dparams = as.list(universal_lognormal$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qlnorm,
+    dparams = as.list(universal_lognormal$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Log-normal"
+  ) +
+  theme_minimal()
+
+qq_weibull <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qweibull,
+    dparams = as.list(universal_weibull$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qweibull,
+    dparams = as.list(universal_weibull$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Weibull"
+  ) +
+  theme_minimal()
+
+qq_normal + qq_gamma + qq_lognormal + qq_weibull
+```
 
 ## Action Genre Downside Risk
 
