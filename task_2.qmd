@@ -94,9 +94,97 @@ ggplot(
 
 The boxplots suggest that Franchise films generally have higher production budgets than Original films, as shown by the higher median budget. The Franchise group also has a wider interquartile range on the displayed logarithmic scale, indicating greater variation in the middle 50% of its budgets on a multiplicative scale. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in that group. However, the distributions overlap, so the difference is not absolute: some Original films have budgets comparable to those of Franchise films. These visual findings will be assessed further using a confidence interval for the difference in median budgets.
 
+```{r}
+#| label: task2-budget-summary
+
+budget_summary <- movies_clean |>
+  filter(
+    !is.na(budget_m),
+    budget_m > 0,
+    !is.na(franchise_status)
+  ) |>
+  group_by(franchise_status) |>
+  summarise(
+    sample_size = n(),
+    median_budget_m = median(budget_m),
+    .groups = "drop"
+  )
+
+budget_summary |>
+  gt::gt() |>
+  gt::fmt_number(
+    columns = median_budget_m,
+    decimals = 2
+  ) |>
+  gt::cols_label(
+    franchise_status = "Film classification",
+    sample_size = "Sample size",
+    median_budget_m = "Median budget (USD millions)"
+  )
+```
+
 ## Interval Estimation
 
-\[Document your method and interval estimate.\]
+```{r}
+#| label: task2-bootstrap-data
+
+original_budgets <- movies_clean |>
+  filter(
+    franchise_status == "Original",
+    !is.na(budget_m),
+    budget_m > 0
+  ) |>
+  pull(budget_m)
+
+franchise_budgets <- movies_clean |>
+  filter(
+    franchise_status == "Franchise",
+    !is.na(budget_m),
+    budget_m > 0
+  ) |>
+  pull(budget_m)
+```
+
+```{r}
+#| label: task2-bootstrap-results
+
+set.seed(5242)
+
+bootstrap_results <- tibble(
+  replicate = 1:1000
+) |>
+  mutate(
+    boot_diff = map_dbl(replicate, function(i) {
+      original_boot <- sample(
+        x = original_budgets,
+        size = length(original_budgets),
+        replace = TRUE
+      )
+      
+      franchise_boot <- sample(
+        x = franchise_budgets,
+        size = length(franchise_budgets),
+        replace = TRUE
+      )
+      
+      median(franchise_boot) - median(original_boot)
+    })
+  )
+```
+
+```{r}
+#| label: task2-bootstrap-ci
+
+bootstrap_ci <- bootstrap_results |>
+  summarise(
+    lower = quantile(boot_diff, probs = 0.025),
+    upper = quantile(boot_diff, probs = 0.975)
+  )
+
+bootstrap_ci
+```
+
+To estimate the uncertainty in the difference between median production budgets, we used a bootstrap percentile method with 1,000 resamples. In each resample, budgets were sampled with replacement separately for Original and Franchise films, preserving the sample size of each group. The difference between the resampled medians was calculated as Franchise minus Original, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to obtain a 95% interval estimate. The resulting interval was approximately **\$9.00 million to \$25.03 million**, compared with an observed median budget difference of \$18 million. As the interval lies entirely above zero, the results provide evidence that Franchise films have a higher median production budget than Original films.
 
 ## Discussion
 
