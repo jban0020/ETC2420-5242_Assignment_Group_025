@@ -4,6 +4,13 @@ format:
   pdf:
     toc: true
     number-sections: true
+    geometry:
+      - margin=2cm
+    fontsize: 11pt
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
 execute:
   warning: false
   message: false
@@ -22,17 +29,16 @@ library(patchwork)
 library(scales)
 library(MASS)
 
+knitr::opts_chunk$set(echo = knitr::is_html_output())
+
 movies <- read_csv("data/movies.csv")
 ```
 
 ## Introduction
-
-[Explain the two financial planning questions.]
+Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
 
 ## Universal Pictures Budget Modelling
-## Universal Pictures Budget Modelling
-
-[Document the distributions considered.]
+We used the 243 Universal Pictures films (by `primary_company`) released up to 2016 with a valid budget, treating budgets under \$10,000 as missing-data placeholders. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
 
 ```{r}
 #| label: task3-universal-data
@@ -50,6 +56,7 @@ universal_films <- movies |>
 
 ```{r}
 #| label: task3-universal-hist
+#| include: !expr knitr::is_html_output()
 
 ggplot(universal_films, aes(x = budget_m)) +
   geom_histogram(
@@ -94,7 +101,8 @@ universal_weibull <- fitdistr(
 ```{r}
 #| label: tbl-task3-aic
 #| tbl-cap: "Distributions fitted to Universal Pictures budgets, ordered by AIC (lowest first)"
-#| tbl-cap-location: top
+#| tbl-cap-location: bottom
+#| tbl-pos: "H"
 
 universal_comparison <- tibble(
   model = c(
@@ -138,6 +146,7 @@ universal_comparison <- tibble(
 
 universal_comparison |>
   gt() |>
+  tab_options(table.width = pct(100)) |>
   cols_label(
     model = "Distribution",
     parameters = "Parameters (units)",
@@ -156,11 +165,17 @@ universal_comparison |>
   )
 ```
 
+AIC rewards a close fit but penalises extra parameters, so lower is better. As all four distributions have two parameters, the ranking in @tbl-task3-aic reflects fit alone. The gamma has the lowest AIC (2320.1), with the Weibull effectively tied (2320.6); the log-normal is 29 points worse and the normal is far behind (2454.1). AIC cannot separate the top two or show whether either fits well, so we also used Q-Q plots.
+
+In @fig-task3-qq, the normal curves away at both ends: its lowest theoretical quantiles are negative (it gives about a 12% chance of a negative budget), and the largest budgets sit well above the line, so it understates expensive films. The log-normal errs the other way: its top theoretical quantile is over \$500m, against Universal's actual maximum of \$209m. The gamma and Weibull both track the line, but for the biggest budgets the Weibull points drift above it while the gamma stays close. As large budgets drive Finance's exposure, and the gamma also has the lowest AIC, we recommend the gamma distribution (shape 1.382, rate 0.031 per \$m).
+
 ```{r}
 #| label: fig-task3-qq
 #| fig-cap: "Q-Q plots of Universal Pictures budgets against each fitted distribution. Points close to the line indicate a good fit."
 #| fig-width: 7
 #| fig-height: 5
+#| out-width: "85%"
+#| fig-pos: "H"
 
 qq_normal <-
   ggplot(universal_films, aes(sample = budget_m)) +
@@ -234,13 +249,167 @@ qq_normal + qq_gamma + qq_lognormal + qq_weibull
 ```
 
 ## Action Genre Downside Risk
+For downside risk we used all studios: the 588 films with Action as their primary genre, released up to 2016, with a valid budget and positive revenue (zero revenue is also a placeholder). The sample 25th percentile of ROI is 0.91 (@tbl-task3-q25), so a quarter of Action films returned less than 91 cents of box office for every dollar of budget.
+```{r}
+#| label: task3-action-data
 
-[Document your percentile estimation methods.]
+action_films <- movies |>
+  filter(
+    release_year <= 2016,
+    primary_genre == "Action",
+    budget >= 10000,
+    revenue > 0
+  ) |>
+  mutate(
+    roi = revenue / budget
+  )
+
+action_q25 <- quantile(action_films$roi, probs = 0.25)
+```
+
+```{r}
+#| label: task3-action-bootstrap
+
+set.seed(2420)
+
+B <- 5000
+
+boot_q25 <- tibble(
+  simulation = 1:B,
+  q25_roi = replicate(B, {
+    boot_sample <- sample(action_films$roi, size = nrow(action_films), replace = TRUE)
+    quantile(boot_sample, probs = 0.25)
+  })
+)
+
+boot_q25_ci <- quantile(boot_q25$q25_roi, probs = c(0.025, 0.975))
+
+boot_q25_plot <- boot_q25 |>
+  ggplot(aes(x = q25_roi)) +
+  geom_histogram(bins = 35, boundary = 0) +
+  geom_vline(xintercept = action_q25, linewidth = 1) +
+  geom_vline(xintercept = boot_q25_ci, linetype = "dashed", linewidth = 1) +
+  labs(
+    title = "Bootstrap 25th percentiles",
+    x = "Bootstrap 25th percentile of ROI",
+    y = "Number of bootstrap samples"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: task3-action-lognormal
+
+action_lognormal <- fitdistr(
+  action_films$roi,
+  densfun = "lognormal"
+)
+
+action_qq_plot <-
+  ggplot(action_films, aes(sample = log(roi))) +
+  stat_qq(
+    distribution = qnorm,
+    dparams = list(
+      mean = action_lognormal$estimate["meanlog"],
+      sd = action_lognormal$estimate["sdlog"]
+    )
+  ) +
+  stat_qq_line(
+    distribution = qnorm,
+    dparams = list(
+      mean = action_lognormal$estimate["meanlog"],
+      sd = action_lognormal$estimate["sdlog"]
+    )
+  ) +
+  labs(
+    x = "Theoretical quantiles (log ROI)",
+    y = "Observed log ROI",
+    title = "Log-normal check (log scale)"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: task3-action-model
+
+action_q25_model <- qlnorm(
+  0.25,
+  meanlog = action_lognormal$estimate["meanlog"],
+  sdlog = action_lognormal$estimate["sdlog"]
+)
+
+set.seed(2420)
+
+sim_q25 <- tibble(
+  simulation = 1:B,
+  q25_roi = replicate(B, {
+    sim_sample <- rlnorm(nrow(action_films), meanlog = action_lognormal$estimate["meanlog"], sdlog = action_lognormal$estimate["sdlog"])
+    sim_fit <- fitdistr(sim_sample, densfun = "lognormal")
+    qlnorm(0.25, meanlog = sim_fit$estimate["meanlog"], sdlog = sim_fit$estimate["sdlog"])
+  })
+)
+
+sim_q25_ci <- quantile(sim_q25$q25_roi, probs = c(0.025, 0.975))
+```
+
+We estimated a 95% interval in two ways. The percentile bootstrap assumes only that the films are independent and representative of Action films. With seed 2420, we drew 5,000 resamples of the 588 ROI values with replacement, took each resample's 25th percentile, and used the 2.5th and 97.5th percentiles of these estimates as the interval. The model-based method assumes ROI is log-normal, a natural choice for a positive, right-skewed ratio. Fitting it by maximum likelihood gives meanlog = 0.482 and sdlog = 1.173, and a 25th percentile of 0.73. We simulated 5,000 samples of 588 films from this model (seed 2420), refitted the log-normal to each, and took the 2.5th and 97.5th percentiles of their 25th percentiles.
+
+```{r}
+#| label: tbl-task3-q25
+#| tbl-cap: "95% interval estimates for the 25th percentile of ROI for Action films, from two methods"
+#| tbl-cap-location: bottom
+#| tbl-pos: "H"
+
+action_comparison <- tibble(
+  method = c(
+    "Percentile bootstrap",
+    "Fitted log-normal model"
+  ),
+  estimate = c(
+    action_q25,
+    action_q25_model
+  ),
+  lower = c(
+    boot_q25_ci[1],
+    sim_q25_ci[1]
+  ),
+  upper = c(
+    boot_q25_ci[2],
+    sim_q25_ci[2]
+  )
+)
+
+action_comparison |>
+  gt() |>
+  tab_options(table.width = pct(100)) |>
+  cols_label(
+    method = "Method",
+    estimate = "25th percentile of ROI",
+    lower = "95% lower",
+    upper = "95% upper"
+  ) |>
+  fmt_number(
+    columns = c(estimate, lower, upper),
+    decimals = 2
+  )
+```
 
 ## Comparison of Interval Estimates
 
-[Compare methods, assumptions and findings.]
+```{r}
+#| label: fig-task3-action
+#| fig-cap: "Left: bootstrap distribution of the 25th percentile of Action-film ROI (solid line: sample estimate; dashed lines: 95% interval). Right: Q-Q plot of log ROI against the fitted log-normal model."
+#| fig-width: 7
+#| fig-height: 3.5
+#| out-width: "90%"
+#| fig-pos: "H"
+
+boot_q25_plot + action_qq_plot
+```
+The two methods do not agree (@tbl-task3-q25): the bootstrap gives 0.91 (95% interval 0.80 to 1.05) and the model gives 0.73 (0.66 to 0.82). The intervals barely overlap, and the model's interval excludes the sample estimate. The most likely cause is the log-normal assumption. In the right panel of @fig-task3-action, the lowest points fall well below the line, so the worst Action flops lost far more of their budget than a log-normal would predict. These extremes drag meanlog down (0.48, against a median log ROI of 0.68) and inflate sdlog, pulling the model's 25th percentile below what the films show; its narrower interval reflects trust in that shape, not extra information. A percentile is unaffected by how extreme the worst values are, so with 588 films and a bootstrap distribution centred on the estimate (left panel), we prefer the bootstrap interval.
 
 ## Summary for the Finance Team
 
-[Summarise the implications in plain language.]
+**Budget model.** We recommend the simulator use a gamma distribution with shape 1.382 and rate 0.031 per \$m. Of four shapes tested on 243 Universal films, using a model-comparison score (AIC) and visual checks, it fits best, including the few very expensive films, and it matches the average budget of about \$44.5m. A normal (bell-shaped) curve would even generate negative budgets.
+
+**Action downside risk.** Plan around an ROI of 0.91. Historically, one in four Action films earned less than 91 cents at the box office per dollar of budget, so roughly two of the eight contracted Action releases could fall below that level. The plausible range is 0.80 to 1.05, so use 0.80 for cautious stress tests. This figure comes from resampling the actual films; a fitted curve (0.73) did not match the worst results. ROI counts self-reported box office only, with no marketing costs, and budgets are not adjusted for inflation.
