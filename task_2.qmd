@@ -1,9 +1,10 @@
 ---
 title: "Task 2: Franchise vs. Original: Investment Strategy"
 format:
-  html:
+  pdf:
     toc: true
     number-sections: true
+    code-fold: true
 execute:
   warning: false
   message: false
@@ -14,6 +15,8 @@ execute:
 ## Introduction
 
 Meridian Pictures must decide how to balance investment between Original films and Franchise films. This analysis compares their production budget distributions, estimates the difference in median budgets, and considers what the evidence implies for future investment decisions.
+
+The analysis uses films released by the end of 2016. Films with missing release years and films released after 2016 were excluded. Budgets below \$10,000 and nonpositive revenue values were treated as missing, consistent with the dataset documentation. The comparison uses all films with valid budget information and a known franchise classification, rather than restricting the analysis to the five focus genres.
 
 ```{r}
 #| label: task2-setup
@@ -232,7 +235,9 @@ revenue_summary |>
 
 The findings partially support leadership's concern about the allocation of production budgets. Franchise films had a median budget of \$40 million, compared with \$22 million for Original films, and the 95% bootstrap confidence interval for the difference in medians (Franchise minus Original) was approximately \$9.00 million to \$25.03 million. As this interval lies entirely above zero, the results support a higher median budget for Franchise films. However, the budget distributions overlap, so not all Original films have smaller budgets than Franchise films.
 
-The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data.
+The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data. The unequal group sizes also affect the comparison of total revenue, while the greater concentration of revenue among the top five Franchise films suggests that the group total is more sensitive to a small number of high-performing films.
+
+These revenue figures do not account for production or marketing costs and therefore cannot establish which group is more profitable.
 
 ## Investment Strategy Recommendations
 
