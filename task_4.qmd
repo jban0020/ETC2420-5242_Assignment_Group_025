@@ -554,6 +554,9 @@ task4_mh_chains <- do.call(
   task4_mh_chains
 )
 saveRDS(task4_mh_chains, "task4_mh_fit.rds")
+
+# Combine the four chains into a matrix of posterior draws
+task4_mh_draws <- as.matrix(task4_mh_chains)
 ```
 
 ```{r}
@@ -640,8 +643,6 @@ predictors <- c(
   "crew_10"
 )
 
-# Metropolis-Hastings posterior samples
-task4_mh_draws <- as.matrix(task4_mh_chains)
 
 # Convert Bayesian coefficients to comparable odds ratios
 bayesian_or_draws <- cbind(
