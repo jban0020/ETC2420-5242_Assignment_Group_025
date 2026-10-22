@@ -35,10 +35,8 @@ movies <- read_csv("data/movies.csv")
 ```
 
 ## Introduction
+Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
 
-[Explain the two financial planning questions.]
-
-## Universal Pictures Budget Modelling
 ## Universal Pictures Budget Modelling
 
 [Document the distributions considered.]
@@ -59,7 +57,6 @@ universal_films <- movies |>
 
 ```{r}
 #| label: task3-universal-hist
-
 #| include: !expr knitr::is_html_output()
 
 ggplot(universal_films, aes(x = budget_m)) +
@@ -404,4 +401,3 @@ boot_q25_plot + action_qq_plot
 
 ## Summary for the Finance Team
 
-[Summarise the implications in plain language.]
