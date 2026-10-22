@@ -4,6 +4,9 @@ format:
   pdf:
     toc: true
     number-sections: true
+    geometry:
+      - margin=2cm
+    fontsize: 11pt
 execute:
   warning: false
   message: false
@@ -94,7 +97,8 @@ universal_weibull <- fitdistr(
 ```{r}
 #| label: tbl-task3-aic
 #| tbl-cap: "Distributions fitted to Universal Pictures budgets, ordered by AIC (lowest first)"
-#| tbl-cap-location: top
+#| tbl-cap-location: bottom
+#| tbl-pos: "H"
 
 universal_comparison <- tibble(
   model = c(
@@ -161,6 +165,7 @@ universal_comparison |>
 #| fig-cap: "Q-Q plots of Universal Pictures budgets against each fitted distribution. Points close to the line indicate a good fit."
 #| fig-width: 7
 #| fig-height: 5
+#| fig-pos: "H"
 
 qq_normal <-
   ggplot(universal_films, aes(sample = budget_m)) +
@@ -234,8 +239,52 @@ qq_normal + qq_gamma + qq_lognormal + qq_weibull
 ```
 
 ## Action Genre Downside Risk
+```{r}
+#| label: task3-action-data
 
-[Document your percentile estimation methods.]
+action_films <- movies |>
+  filter(
+    release_year <= 2016,
+    primary_genre == "Action",
+    budget >= 10000,
+    revenue > 0
+  ) |>
+  mutate(
+    roi = revenue / budget
+  )
+
+action_q25 <- quantile(action_films$roi, probs = 0.25)
+```
+
+```{r}
+#| label: task3-action-bootstrap
+
+set.seed(2420)
+
+B <- 5000
+
+boot_q25 <- tibble(
+  simulation = 1:B,
+  q25_roi = replicate(B, {
+    boot_sample <- sample(action_films$roi, size = nrow(action_films), replace = TRUE)
+    quantile(boot_sample, probs = 0.25)
+  })
+)
+
+boot_q25_ci <- quantile(boot_q25$q25_roi, probs = c(0.025, 0.975))
+
+boot_q25_plot <- boot_q25 |>
+  ggplot(aes(x = q25_roi)) +
+  geom_histogram(bins = 35, boundary = 0) +
+  geom_vline(xintercept = action_q25, linewidth = 1) +
+  geom_vline(xintercept = boot_q25_ci, linetype = "dashed", linewidth = 1) +
+  labs(
+    title = "Bootstrap 25th percentiles",
+    x = "Bootstrap 25th percentile of ROI",
+    y = "Number of bootstrap samples"
+  ) +
+  theme_minimal()
+```
 
 ## Comparison of Interval Estimates
 
