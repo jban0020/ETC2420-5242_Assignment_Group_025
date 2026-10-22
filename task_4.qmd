@@ -241,21 +241,442 @@ task4_odds_table |>
     caption = "Selected frequentist logistic regression results"
   )
 ```
-### Interpretation of Model Results
+**Interpretation**
 
-The results suggest that franchise films have approximately **77.6% lower odds of flopping** than original films, after accounting for genre, budget and crew size. A further $10 million in budget is associated with around 4% lower flop odds, while an additional 10 crew members corresponds to a 9.4% reduction in estimated odds. Although these patterns highlight factors associated with commercial performance, they should not be interpreted as causal relationships or equivalent changes in flop probability.
+The frequentist logistic regression was fitted using 3,213 films with complete information. After accounting for genre, budget and crew size, franchise films had approximately 77.6% lower odds of flopping than original films (OR = 0.224, 95% CI: 0.126–0.399). A further $10 million in budget was associated with 4.0% lower odds of flopping (OR = 0.960, 95% CI: 0.936–0.985), while an additional 10 crew members was associated with 9.4% lower odds (OR = 0.906, 95% CI: 0.877–0.936). These findings suggest that franchise status, budget and crew size are associated with financial outcomes, although they do not establish causal relationships.
 
-### Model Limitations
+**Limitations**
 
-The model was fitted using **3,213 films with complete information** for the selected variables. One concern is the Foreign genre, which contains only one film with a recorded outcome. This creates complete separation, making its coefficient highly unstable and unsuitable for reliable decision-making. Additionally, missing financial information may affect how well the analysed films represent the wider dataset. These limitations should be considered when using the model to assess future film proposals.
+The model has two important limitations. First, the Foreign genre contained only one film with a known outcome, which was a flop. This resulted in complete separation and an unstable coefficient, making its estimated odds ratio unreliable. Second, the analysis used 3,213 of the original 4,801 films because observations with missing information were excluded. If missing financial data are not random, the estimated relationships may not represent all films. These limitations should be considered when interpreting the results and comparing them with the Bayesian model.
 
 ## Bayesian Logistic Regression
 
-[Insert analysis and interpretation.]
+```{r}
+#| label: task4-bayesian-data-checks
+#| include: false
+
+# Outcome balance
+task4_model_data |>
+  dplyr::count(flop) |>
+  dplyr::mutate(proportion = n / sum(n))
+
+# Number of flops and non-flops in each genre
+task4_model_data |>
+  dplyr::group_by(primary_genre) |>
+  dplyr::summarise(
+    films = dplyr::n(),
+    flops = sum(flop == 1),
+    non_flops = sum(flop == 0),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(films)
+
+# Predictor scales
+task4_model_data |>
+  dplyr::summarise(
+    budget_sd = sd(budget_10m),
+    crew_sd = sd(crew_10),
+    budget_median = median(budget_10m),
+    crew_median = median(crew_10),
+    budget_max = max(budget_10m),
+    crew_max = max(crew_10)
+  )
+```
+
+```{r}
+#| label: task4-bayesian-predictors
+#| include: false
+
+task4_budget_mean <- mean(task4_model_data$budget_10m)
+task4_budget_sd <- sd(task4_model_data$budget_10m)
+
+task4_crew_mean <- mean(task4_model_data$crew_10)
+task4_crew_sd <- sd(task4_model_data$crew_10)
+
+task4_bayesian_data <- task4_model_data |>
+  dplyr::mutate(
+    budget_z = (budget_10m - task4_budget_mean) /
+      task4_budget_sd,
+    crew_z = (crew_10 - task4_crew_mean) /
+      task4_crew_sd
+  )
+
+summary(task4_bayesian_data[, c("budget_z", "crew_z")])
+```
+
+```{r}
+#| label: task4-bayesian-prior-check
+#| include: false
+
+set.seed(2420)
+
+# Draw hypothetical coefficients from proposed priors
+prior_intercept <- 2.5 * rt(10000, df = 3)
+prior_franchise <- rnorm(10000, mean = 0, sd = 1.5)
+prior_budget <- rnorm(10000, mean = 0, sd = 0.5)
+prior_crew <- rnorm(10000, mean = 0, sd = 0.5)
+
+# Illustrative profile: original film with average budget and crew
+prior_prob_original <- plogis(prior_intercept)
+
+# Illustrative profile: franchise film with average budget and crew
+prior_prob_franchise <- plogis(
+  prior_intercept + prior_franchise
+)
+
+# Summarise implied prior probabilities
+rbind(
+  Original = quantile(
+    prior_prob_original,
+    c(0.025, 0.5, 0.975)
+  ),
+  Franchise = quantile(
+    prior_prob_franchise,
+    c(0.025, 0.5, 0.975)
+  )
+)
+```
+
+```{r}
+#| label: task4-bayesian-prior-comparison
+#| include: false
+
+set.seed(2420)
+
+n_draws <- 10000
+
+# Candidate intercept priors
+intercept_a <- 2.5 * rt(n_draws, df = 3)
+intercept_b <- rnorm(n_draws, mean = -1, sd = 1)
+
+# Other coefficient priors
+franchise_effect <- rnorm(n_draws, 0, 1.5)
+budget_effect <- rnorm(n_draws, 0, 0.5)
+crew_effect <- rnorm(n_draws, 0, 0.5)
+
+# Representative profiles on standardised scales
+prior_profiles <- data.frame(
+  profile = c(
+    "Original, average scale",
+    "Franchise, average scale",
+    "Original, higher scale"
+  ),
+  franchise = c(0, 1, 0),
+  budget_z = c(0, 0, 1),
+  crew_z = c(0, 0, 1)
+)
+
+# Function to summarise implied probabilities
+check_prior <- function(intercept, prior_name) {
+
+  results <- lapply(
+    seq_len(nrow(prior_profiles)),
+    function(i) {
+
+      log_odds <- intercept +
+        franchise_effect * prior_profiles$franchise[i] +
+        budget_effect * prior_profiles$budget_z[i] +
+        crew_effect * prior_profiles$crew_z[i]
+
+      probabilities <- plogis(log_odds)
+
+      data.frame(
+        prior = prior_name,
+        profile = prior_profiles$profile[i],
+        lower = quantile(probabilities, 0.025),
+        median = median(probabilities),
+        upper = quantile(probabilities, 0.975)
+      )
+    }
+  )
+
+  dplyr::bind_rows(results)
+}
+
+prior_comparison <- dplyr::bind_rows(
+  check_prior(intercept_a, "A: Student-t(3, 0, 2.5)"),
+  check_prior(intercept_b, "B: Normal(-1, 1)")
+)
+
+print(prior_comparison)
+```
+
+```{r}
+#| label: task4-bayesian-final-priors
+#| include: false
+
+# Design matrix for Bayesian logistic regression
+task4_formula <- flop ~ primary_genre + franchise_status +
+  budget_z + crew_z
+
+task4_X <- model.matrix(
+  task4_formula,
+  data = task4_bayesian_data
+)
+
+task4_y <- task4_bayesian_data$flop
+
+# Prior standard deviations for regression coefficients
+task4_prior_sd <- rep(1.5, ncol(task4_X))
+names(task4_prior_sd) <- colnames(task4_X)
+
+task4_prior_sd["(Intercept)"] <- 1
+task4_prior_sd["budget_z"] <- 0.5
+task4_prior_sd["crew_z"] <- 0.5
+
+# Prior means
+task4_prior_mean <- rep(0, ncol(task4_X))
+names(task4_prior_mean) <- colnames(task4_X)
+
+task4_prior_mean["(Intercept)"] <- -1
+
+# Log-posterior = log-likelihood + log-prior
+task4_log_posterior <- function(beta) {
+
+  eta <- drop(task4_X %*% beta)
+
+  # Numerically stable Bernoulli log-likelihood
+  log_likelihood <- sum(
+    task4_y * eta -
+      (pmax(eta, 0) + log1p(exp(-abs(eta))))
+  )
+
+  log_prior <- sum(
+    dnorm(
+      beta,
+      mean = task4_prior_mean,
+      sd = task4_prior_sd,
+      log = TRUE
+    )
+  )
+
+  log_likelihood + log_prior
+}
+```
+
+```{r}
+#| label: task4-bayesian-prior-predictive
+#| include: false
+
+task4_prior_fit <- brms::brm(
+  flop ~ primary_genre + franchise_status +
+    budget_z + crew_z,
+  data = task4_bayesian_data,
+  family = brms::bernoulli(),
+  prior = task4_bayesian_priors,
+  sample_prior = "only",
+  backend = "cmdstanr",
+  chains = 2,
+  iter = 1000,
+  warmup = 500,
+  cores = 2,
+  seed = 2420,
+  file = "task4_prior_predictive_fit"
+)
+
+# Prior-predictive probabilities for all modelled films
+prior_probabilities <- brms::posterior_epred(
+  task4_prior_fit
+)
+
+# Distribution of the average implied flop probability
+prior_average_risk <- rowMeans(prior_probabilities)
+
+quantile(
+  prior_average_risk,
+  c(0.025, 0.5, 0.975)
+)
+
+# Simulated number of flops in the modelling sample
+prior_simulated_outcomes <- brms::posterior_predict(
+  task4_prior_fit
+)
+
+prior_flop_counts <- rowSums(prior_simulated_outcomes)
+
+quantile(
+  prior_flop_counts,
+  c(0.025, 0.5, 0.975)
+)
+```
+
+```{r}
+#| label: task4-bayesian-fit
+#| include: false
+
+# Locate a suitable starting point for Metropolis sampling
+task4_mode <- optim(
+  par = task4_prior_mean,
+  fn = function(beta) -task4_log_posterior(beta),
+  method = "BFGS",
+  hessian = TRUE,
+  control = list(maxit = 2000)
+)
+
+print(task4_mode$convergence)
+
+# Estimate the proposal covariance
+task4_proposal_cov <- solve(task4_mode$hessian)
+
+# Short pilot run to assess the sampler
+set.seed(2420)
+
+task4_mh_pilot <- MCMCpack::MCMCmetrop1R(
+  fun = task4_log_posterior,
+  theta.init = as.numeric(task4_mode$par),
+  V = task4_proposal_cov,
+  tune = 0.8,
+  burnin = 1000,
+  mcmc = 3000,
+  thin = 1,
+  logfun = TRUE,
+  verbose = 0
+)
+```
+
+```{r}
+#| label: task4-bayesian-diagnostics
+#| include: false
+
+# Pilot acceptance and rejection rates
+task4_pilot_rejection <- coda::rejectionRate(
+  task4_mh_pilot
+)
+
+task4_pilot_acceptance <- 1 - task4_pilot_rejection
+
+cat(
+  "Pilot rejection rate:",
+  round(task4_pilot_rejection, 3),
+  "\n"
+)
+
+cat(
+  "Pilot acceptance rate:",
+  round(task4_pilot_acceptance, 3),
+  "\n"
+)
+
+# Effective sample size for each coefficient
+task4_pilot_ess <- coda::effectiveSize(
+  task4_mh_pilot
+)
+
+cat(
+  "Minimum pilot ESS:",
+  round(min(task4_pilot_ess), 1),
+  "\n"
+)
+```
+
+
+*Bayesian model and prior justification*
+
+A Bayesian logistic regression was fitted to the same 3,213 films used in the frequentist analysis. The model included primary genre, franchise status, budget and crew size. Budget and crew size were standardised to make the prior assumptions easier to interpret. Posterior distributions were estimated using Markov chain Monte Carlo (MCMC), implemented through Stan's No-U-Turn Sampler (NUTS).
+
+Weakly informative Normal priors were assigned to the log-odds coefficients: Normal(0, 1.5) for genre and franchise effects and Normal(0, 0.5) for standardised budget and crew size. An initial broad intercept prior was examined before selecting Normal(-1, 1). Prior-predictive checks indicated that the revised specification allowed substantial variation in flop risk without concentrating almost all probability on extreme outcomes.
+
+*Bayesian findings and limitations*
+
+The model showed satisfactory sampling diagnostics, with R-hat values of approximately 1.00, adequate effective sample sizes and no divergent transitions. Franchise status, higher budgets and larger crews were associated with lower flop odds.
+
+The Foreign genre remained highly uncertain. Its posterior log-odds coefficient was 0.88, with a 95% credible interval of −1.57 to 3.43. Since only one Foreign film had a known outcome, the prior helped regularise the estimate but could not compensate for the lack of data. These findings describe associations rather than causal effects.
 
 ## Model Comparison
 
-[Compare relevant model estimates and intervals.]
+```{r}
+#| label: task4-model-comparison-data
+#| include: false
+
+# Frequentist estimates and 95% confidence intervals
+frequentist_coefs <- coef(task4_frequentist)
+frequentist_ci <- confint.default(task4_frequentist)
+
+# Bayesian posterior summaries
+bayesian_coefs <- brms::fixef(task4_bayesian)
+
+# Compare coefficients on matching scales
+comparison <- data.frame(
+  Predictor = c("Franchise", "Budget (+$10m)", "Crew (+10)"),
+  Frequentist_OR = exp(frequentist_coefs[
+    c("franchise_statusFranchise", "budget_10m", "crew_10")
+  ]),
+  Frequentist_Lower = exp(frequentist_ci[
+    c("franchise_statusFranchise", "budget_10m", "crew_10"), 1
+  ]),
+  Frequentist_Upper = exp(frequentist_ci[
+    c("franchise_statusFranchise", "budget_10m", "crew_10"), 2
+  ]),
+  Bayesian_OR = exp(c(
+    bayesian_coefs["franchise_statusFranchise", "Estimate"],
+    bayesian_coefs["budget_z", "Estimate"] / task4_budget_sd,
+    bayesian_coefs["crew_z", "Estimate"] / task4_crew_sd
+  )),
+  Bayesian_Lower = exp(c(
+    bayesian_coefs["franchise_statusFranchise", "Q2.5"],
+    bayesian_coefs["budget_z", "Q2.5"] / task4_budget_sd,
+    bayesian_coefs["crew_z", "Q2.5"] / task4_crew_sd
+  )),
+  Bayesian_Upper = exp(c(
+    bayesian_coefs["franchise_statusFranchise", "Q97.5"],
+    bayesian_coefs["budget_z", "Q97.5"] / task4_budget_sd,
+    bayesian_coefs["crew_z", "Q97.5"] / task4_crew_sd
+  ))
+)
+
+print(comparison)
+```
+
+```{r}
+#| label: tbl-task4-model-comparison
+#| echo: false
+#| tbl-cap: "Frequentist and Bayesian odds ratios with 95% uncertainty intervals."
+
+comparison_display <- data.frame(
+  Predictor = comparison$Predictor,
+  Frequentist = sprintf(
+    "%.3f (%.3f–%.3f)",
+    comparison$Frequentist_OR,
+    comparison$Frequentist_Lower,
+    comparison$Frequentist_Upper
+  ),
+  Bayesian = sprintf(
+    "%.3f (%.3f–%.3f)",
+    comparison$Bayesian_OR,
+    comparison$Bayesian_Lower,
+    comparison$Bayesian_Upper
+  )
+)
+
+knitr::kable(
+  comparison_display,
+  col.names = c(
+    "Predictor",
+    "Frequentist OR (95% CI)",
+    "Bayesian OR (95% CrI)"
+  ),
+  row.names = FALSE
+)
+```
+
+```{r}
+#| label: task4-posterior-probability
+#| include: false
+
+task4_posterior_draws <- brms::as_draws_df(task4_bayesian)
+
+franchise_draws <- task4_posterior_draws[["b_franchise_statusFranchise"]]
+
+prob_franchise_negative <- mean(franchise_draws < 0)
+
+print(prob_franchise_negative)
+```
+
+The frequentist and Bayesian models produced closely aligned results. For franchise films, the frequentist odds ratio was 0.224 (95% confidence interval: 0.126–0.399), compared with a Bayesian odds ratio of 0.229 (95% credible interval: 0.127–0.388). Budget and crew size also showed similar negative associations with flop odds across both models.
+
+Although the intervals are numerically similar, their interpretations differ. A frequentist 95% confidence interval refers to the long-run coverage of the estimation procedure, whereas a Bayesian 95% credible interval contains 95% of the posterior probability for the parameter, conditional on the model and priors.
+
+All 4,000 sampled posterior draws for the franchise coefficient were negative, giving an estimated posterior probability above 99.9% that franchise status is associated with lower flop odds, after accounting for genre, budget and crew size. The agreement between the models strengthens confidence in the direction of these associations, although neither approach establishes causation.
 
 ## Classification Performance
 
