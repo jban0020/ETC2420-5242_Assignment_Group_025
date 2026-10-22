@@ -38,8 +38,7 @@ movies <- read_csv("data/movies.csv")
 Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
 
 ## Universal Pictures Budget Modelling
-
-[Document the distributions considered.]
+We used the 243 Universal Pictures films (by `primary_company`) released up to 2016 with a valid budget, treating budgets under \$10,000 as missing-data placeholders. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
 
 ```{r}
 #| label: task3-universal-data
@@ -165,6 +164,10 @@ universal_comparison |>
     decimals = 1
   )
 ```
+
+AIC rewards a close fit but penalises extra parameters, so lower is better. As all four distributions have two parameters, the ranking in @tbl-task3-aic reflects fit alone. The gamma has the lowest AIC (2320.1), with the Weibull effectively tied (2320.6); the log-normal is 29 points worse and the normal is far behind (2454.1). AIC cannot separate the top two or show whether either fits well, so we also used Q-Q plots.
+
+In @fig-task3-qq, the normal curves away at both ends: its lowest theoretical quantiles are negative (it gives about a 12% chance of a negative budget), and the largest budgets sit well above the line, so it understates expensive films. The log-normal errs the other way: its top theoretical quantile is over \$500m, against Universal's actual maximum of \$209m. The gamma and Weibull both track the line, but for the biggest budgets the Weibull points drift above it while the gamma stays close. As large budgets drive Finance's exposure, and the gamma also has the lowest AIC, we recommend the gamma distribution (shape 1.382, rate 0.031 per \$m).
 
 ```{r}
 #| label: fig-task3-qq
