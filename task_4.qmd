@@ -688,7 +688,174 @@ All retained Metropolis–Hastings samples for the franchise coefficient were ne
 
 ## Classification Performance
 
-[Insert confusion matrix and evaluation metrics.]
+```{r}
+#| label: task4-classification-predictions
+#| include: false
+
+# Predict flop probabilities using the frequentist model
+task4_predicted_prob <- predict(
+  task4_frequentist,
+  newdata = task4_model_data,
+  type = "response"
+)
+
+# Classify films using a 50% probability threshold
+task4_predicted_class <- ifelse(
+  task4_predicted_prob >= 0.5,
+  1L,
+  0L
+)
+
+# Compare predicted and actual outcomes
+task4_confusion <- table(
+  Actual = factor(task4_model_data$flop, levels = c(0, 1)),
+  Predicted = factor(task4_predicted_class, levels = c(0, 1))
+)
+
+print(task4_confusion)
+```
+
+```{r}
+#| label: task4-classification-metrics
+#| include: false
+
+# Extract the four confusion matrix counts
+task4_tn <- task4_confusion["0", "0"]
+task4_fp <- task4_confusion["0", "1"]
+task4_fn <- task4_confusion["1", "0"]
+task4_tp <- task4_confusion["1", "1"]
+
+# Calculate classification performance
+task4_accuracy <- (task4_tp + task4_tn) / sum(task4_confusion)
+
+task4_sensitivity <- task4_tp / (task4_tp + task4_fn)
+
+task4_specificity <- task4_tn / (task4_tn + task4_fp)
+
+task4_precision <- if (
+  task4_tp + task4_fp > 0
+) {
+  task4_tp / (task4_tp + task4_fp)
+} else {
+  NA_real_
+}
+
+# Summarise performance
+task4_metrics <- data.frame(
+  Metric = c(
+    "Accuracy",
+    "Sensitivity (flops)",
+    "Specificity (non-flops)",
+    "Precision (predicted flops)"
+  ),
+  Value = c(
+    task4_accuracy,
+    task4_sensitivity,
+    task4_specificity,
+    task4_precision
+  )
+)
+
+print(task4_metrics)
+```
+
+```{r}
+#| label: task4-threshold-comparison
+#| include: false
+
+# Compare classification results at two probability thresholds
+task4_threshold_metrics <- function(threshold) {
+
+  predicted <- ifelse(task4_predicted_prob >= threshold, 1L, 0L)
+
+  actual <- task4_model_data$flop
+
+  tp <- sum(predicted == 1 & actual == 1)
+  tn <- sum(predicted == 0 & actual == 0)
+  fp <- sum(predicted == 1 & actual == 0)
+  fn <- sum(predicted == 0 & actual == 1)
+
+  data.frame(
+    Threshold = threshold,
+    Accuracy = (tp + tn) / length(actual),
+    Sensitivity = tp / (tp + fn),
+    Specificity = tn / (tn + fp),
+    Precision = tp / (tp + fp),
+    Flops_Detected = tp,
+    Flops_Missed = fn
+  )
+}
+
+task4_threshold_results <- dplyr::bind_rows(
+  task4_threshold_metrics(0.50),
+  task4_threshold_metrics(0.30)
+)
+
+print(task4_threshold_results)
+```
+
+```{r}
+#| label: tbl-task4-classification-performance
+#| echo: false
+#| tbl-cap: "In-sample classification performance at two probability thresholds."
+
+task4_performance_display <- task4_threshold_results |>
+  dplyr::mutate(
+    Threshold = paste0(round(Threshold * 100), "%"),
+    dplyr::across(
+      c(Accuracy, Sensitivity, Specificity, Precision),
+      ~ sprintf("%.1f%%", .x * 100)
+    )
+  )
+
+knitr::kable(
+  task4_performance_display,
+  col.names = c(
+    "Threshold",
+    "Accuracy",
+    "Sensitivity",
+    "Specificity",
+    "Precision",
+    "Flops detected",
+    "Flops missed"
+  ),
+  row.names = FALSE
+)
+```
+
+```{r}
+#| label: tbl-task4-confusion-matrix
+#| echo: false
+#| tbl-cap: "In-sample confusion matrix at the 30% threshold."
+
+task4_confusion_display <- table(
+  Actual = factor(
+    task4_model_data$flop,
+    levels = c(0, 1),
+    labels = c("Non-flop", "Flop")
+  ),
+  Predicted = factor(
+    ifelse(task4_predicted_prob >= 0.30, 1, 0),
+    levels = c(0, 1),
+    labels = c("Non-flop", "Flop")
+  )
+)
+
+knitr::kable(
+  as.data.frame.matrix(task4_confusion_display),
+  col.names = c("Predicted non-flop", "Predicted flop")
+)
+```
+
+**Classification performance**
+
+At the standard 50% threshold, the model achieved 75.6% accuracy but identified only 5 of the 784 actual flops, giving a sensitivity of just 0.6%. Since flops represented approximately 24.4% of the modelling sample, predicting most films as non-flops produced a misleadingly high accuracy.
+
+A 30% threshold was therefore considered more suitable for identifying financial risk. It increased sensitivity to 43.1%, correctly identifying 338 flops, although specificity decreased to 74.2% and precision was 35.0%. Overall accuracy fell to 66.6%.
+
+For Meridian, identifying potentially unsuccessful productions before approval may be more valuable than maximising accuracy alone. However, the lower threshold also incorrectly flagged 627 non-flops, meaning these predictions should support further review rather than automatic rejection. The 30% threshold is a practical illustration of this trade-off, not a statistically proven optimum.
+
+These results are based on the films used to fit the model and may overstate performance on future productions.
 
 ## Hypothetical Film Pitches
 
