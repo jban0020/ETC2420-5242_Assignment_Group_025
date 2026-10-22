@@ -7,6 +7,10 @@ format:
     geometry:
       - margin=2cm
     fontsize: 11pt
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
 execute:
   warning: false
   message: false
@@ -24,6 +28,8 @@ library(gt)
 library(patchwork)
 library(scales)
 library(MASS)
+
+knitr::opts_chunk$set(echo = knitr::is_html_output())
 
 movies <- read_csv("data/movies.csv")
 ```
@@ -53,6 +59,8 @@ universal_films <- movies |>
 
 ```{r}
 #| label: task3-universal-hist
+
+#| include: !expr knitr::is_html_output()
 
 ggplot(universal_films, aes(x = budget_m)) +
   geom_histogram(
@@ -142,6 +150,7 @@ universal_comparison <- tibble(
 
 universal_comparison |>
   gt() |>
+  tab_options(table.width = pct(100)) |>
   cols_label(
     model = "Distribution",
     parameters = "Parameters (units)",
