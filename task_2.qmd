@@ -186,9 +186,53 @@ bootstrap_ci
 
 To estimate the uncertainty in the difference between median production budgets, we used a bootstrap percentile method with 1,000 resamples. In each resample, budgets were sampled with replacement separately for Original and Franchise films, preserving the sample size of each group. The difference between the resampled medians was calculated as Franchise minus Original, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to obtain a 95% interval estimate. The resulting interval was approximately **\$9.00 million to \$25.03 million**, compared with an observed median budget difference of \$18 million. As the interval lies entirely above zero, the results provide evidence that Franchise films have a higher median production budget than Original films.
 
+```{r}
+#| label: task2-revenue-summary
+
+revenue_summary <- movies_clean |>
+  filter(
+    !is.na(revenue),
+    !is.na(franchise_status)
+  ) |>
+  group_by(franchise_status) |>
+  summarise(
+    films_with_revenue = n(),
+    total_revenue = sum(revenue),
+    median_revenue = median(revenue),
+    .groups = "drop"
+  ) |>
+  mutate(
+    revenue_share = total_revenue / sum(total_revenue) * 100
+  )
+
+revenue_summary |>
+  gt::gt() |>
+  gt::fmt_number(
+    columns = films_with_revenue,
+    decimals = 0
+  ) |>
+  gt::fmt_number(
+    columns = c(total_revenue, median_revenue),
+    decimals = 0
+  ) |>
+  gt::fmt_number(
+    columns = revenue_share,
+    decimals = 1
+  ) |>
+  gt::cols_label(
+    franchise_status = "Film classification",
+    films_with_revenue = "Films with reported revenue",
+    total_revenue = "Total revenue (USD)",
+    median_revenue = "Median revenue (USD)",
+    revenue_share = "Share of reported revenue (%)"
+  )
+```
+
 ## Discussion
 
-\[Discuss the implications of your findings.\]
+The findings partially support leadership's concern about the allocation of production budgets. Franchise films had a median budget of \$40 million, compared with \$22 million for Original films, and the 95% bootstrap confidence interval for the difference in medians (Franchise minus Original) was approximately \$9.00 million to \$25.03 million. As this interval lies entirely above zero, the results support a higher median budget for Franchise films. However, the budget distributions overlap, so not all Original films have smaller budgets than Franchise films.
+
+The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data.
 
 ## Investment Strategy Recommendations
 
