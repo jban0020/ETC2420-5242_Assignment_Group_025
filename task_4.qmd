@@ -57,7 +57,7 @@ movies_focus <- movies_clean |>
 
 ## Introduction
 
-[Explain the purpose of the model.]
+This analysis examines whether information available before production can help Meridian identify films at risk of failing to recover their budgets. Frequentist and Bayesian logistic regression models were fitted using genre, franchise status, budget and crew size. The results are used to assess classification performance and estimate financial risk for three hypothetical film proposals.
 
 ## Outcome and Predictor Definitions
 
@@ -578,6 +578,44 @@ cat(
 )
 ```
 
+```{r}
+#| label: tbl-task4-bayesian-results
+#| echo: false
+#| tbl-cap: "Selected Bayesian logistic regression estimates with 95% credible intervals."
+
+task4_bayesian_results <- data.frame(
+  Predictor = c(
+    "Franchise (vs original)",
+    "Budget (+$10 million)",
+    "Crew (+10 members)"
+  ),
+  Median_OR = c(
+    median(exp(task4_mh_draws[, "franchise_statusFranchise"])),
+    median(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd)),
+    median(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd))
+  ),
+  Lower = c(
+    quantile(exp(task4_mh_draws[, "franchise_statusFranchise"]), 0.025),
+    quantile(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd), 0.025),
+    quantile(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd), 0.025)
+  ),
+  Upper = c(
+    quantile(exp(task4_mh_draws[, "franchise_statusFranchise"]), 0.975),
+    quantile(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd), 0.975),
+    quantile(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd), 0.975)
+  )
+)
+
+task4_bayesian_results |>
+  dplyr::mutate(
+    `Median odds ratio (95% CrI)` = sprintf(
+      "%.3f (%.3f–%.3f)", Median_OR, Lower, Upper
+    )
+  ) |>
+  dplyr::select(Predictor, `Median odds ratio (95% CrI)`) |>
+  knitr::kable(row.names = FALSE)
+```
+
 **Bayesian findings and limitations**
 
 The Bayesian logistic regression was estimated using four Metropolis–Hastings chains. The acceptance rates were approximately 35.5%–36.6%, with a minimum effective sample size of 522.1 and a maximum upper R-hat of 1.012. These diagnostics suggest that the chains mixed reasonably well and produced sufficiently consistent estimates for the main analysis.
@@ -859,8 +897,117 @@ These results are based on the films used to fit the model and may overstate per
 
 ## Hypothetical Film Pitches
 
-[Document pitch scenarios and predictions.]
+```{r}
+#| label: task4-hypothetical-pitches
+#| include: false
+
+task4_pitches <- data.frame(
+  Pitch = c(
+    "Platform Zero",
+    "The Meridian Protocol: Black Tide",
+    "The Things We Never Recorded"
+  ),
+  primary_genre = c("Horror", "Action", "Drama"),
+  franchise_status = c("Original", "Franchise", "Original"),
+  budget_10m = c(0.9, 8.5, 1.8),
+  crew_10 = c(2.4, 9, 3.8)
+)
+
+# Keep the same categories as the fitted model
+task4_pitches$primary_genre <- factor(
+  task4_pitches$primary_genre,
+  levels = sort(unique(task4_model_data$primary_genre))
+)
+
+task4_pitches$franchise_status <- factor(
+  task4_pitches$franchise_status,
+  levels = levels(task4_model_data$franchise_status)
+)
+
+# Apply the standardisation used in the Bayesian model
+task4_pitches <- task4_pitches |>
+  dplyr::mutate(
+    budget_z = (budget_10m - task4_budget_mean) / task4_budget_sd,
+    crew_z = (crew_10 - task4_crew_mean) / task4_crew_sd
+  )
+
+print(task4_pitches)
+```
+
+```{r}
+#| label: task4-pitch-predictions
+#| include: false
+
+# Build the predictor matrix using the fitted model's columns
+task4_pitch_X <- model.matrix(
+  ~ primary_genre + franchise_status + budget_z + crew_z,
+  data = task4_pitches
+)
+
+# Ensure the columns match the Bayesian model
+task4_pitch_X <- task4_pitch_X[, colnames(task4_mh_draws), drop = FALSE]
+
+# Predicted flop probability for every posterior draw and pitch
+task4_pitch_prob_draws <- plogis(
+  task4_mh_draws %*% t(task4_pitch_X)
+)
+
+# Summarise the posterior probabilities
+task4_pitch_results <- data.frame(
+  Pitch = task4_pitches$Pitch,
+  Median_Probability = apply(task4_pitch_prob_draws, 2, median),
+  Lower_95 = apply(task4_pitch_prob_draws, 2, quantile, probs = 0.025),
+  Upper_95 = apply(task4_pitch_prob_draws, 2, quantile, probs = 0.975)
+)
+
+print(task4_pitch_results)
+```
+
+```{r}
+#| label: tbl-task4-pitch-predictions
+#| echo: false
+#| tbl-cap: "Bayesian predicted flop probabilities and 95% credible intervals for three hypothetical pitches."
+
+task4_pitch_display <- task4_pitch_results |>
+  dplyr::mutate(
+    `Flop probability` = sprintf("%.1f%%", Median_Probability * 100),
+    `95% credible interval` = sprintf(
+      "%.1f%%–%.1f%%",
+      Lower_95 * 100,
+      Upper_95 * 100
+    )
+  ) |>
+  dplyr::select(
+    Pitch,
+    `Flop probability`,
+    `95% credible interval`
+  )
+
+knitr::kable(task4_pitch_display, row.names = FALSE)
+```
+
+### Greenlight recommendations
+
+**The Meridian Protocol: Black Tide — Conditional greenlight**
+
+This franchise action film has the lowest predicted flop probability at 4.7% (95% credible interval: 2.7%–7.9%). Although the estimated risk is relatively low, the proposed $85 million budget represents a substantial financial commitment. Meridian could move the project forward, provided the production budget and expected revenue are reviewed before final approval.
+
+**Platform Zero — Conditional greenlight**
+
+With a predicted flop probability of 16.0% (95% credible interval: 11.2%–22.2%), this original horror film presents a moderate level of risk compared with the other two pitches. Its $9 million budget makes it a smaller financial commitment. A conditional greenlight would allow Meridian to explore the project further while checking whether its expected audience and distribution plans support the investment.
+
+**The Things We Never Recorded — Hold for further review**
+
+This original drama has the highest predicted flop probability at 28.8% (95% credible interval: 25.6%–32.6%). Given its proposed $18 million budget, approving the project without further financial assessment would be difficult to justify. Meridian could review the budget, intended audience and distribution strategy before reconsidering the proposal.
+
+These recommendations are based on estimated flop risk rather than guaranteed outcomes. A lower predicted probability does not necessarily mean a project offers a better financial return.
 
 ## Summary for the Head of Production
 
-[Summarise the model's uses and limitations.]
+The greenlight model provides Meridian with an early assessment of a film's financial risk using information available before production begins. By considering genre, franchise status, budget and crew size, it estimates the likelihood of a film failing to recover its production budget.
+
+Among the three proposed films, *The Meridian Protocol: Black Tide* has the lowest estimated flop risk, followed by *Platform Zero*. *The Things We Never Recorded* presents the greatest concern and would benefit from further review before approval.
+
+However, the model has important limitations. Its predictions rely on historical films with sufficient financial information and do not capture factors such as audience demand, marketing, release timing or distribution arrangements. The model also estimates the chance of a flop, not the amount of money a studio might lose. Its classification results were assessed using the same films on which it was trained, so performance on future productions remains uncertain.
+
+Meridian should therefore use these estimates as an early warning tool rather than a final decision-maker. Combining the model's findings with financial forecasts and professional judgement would provide a more balanced basis for greenlight decisions.
