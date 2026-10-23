@@ -2057,5 +2057,3 @@ task4_pitch_results <- data.frame(
   Upper_95 = apply(task4_pitch_prob_draws, 2, quantile, probs = 0.975)
 )
 ```
-
-
