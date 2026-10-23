@@ -7,6 +7,9 @@ format:
     toc: true
     toc-depth: 2
     number-sections: true
+    geometry:
+      - margin=2cm
+    fontsize: 11pt
 execute:
   warning: false
   message: false
@@ -665,7 +668,7 @@ movies <- read_csv("data/movies.csv")
 Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
 
 ## (a) Universal Budget Distributions
-We used the 243 Universal Pictures films (by `primary_company`) released up to 2016 with a valid budget, treating budgets under \$10,000 as missing-data placeholders. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
+We used the 243 Universal Pictures films (by `primary_company`) released from 1962 to 2016, excluding 17 with placeholder budgets under \$10,000. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
 
 ```{r}
 #| label: task3-universal-data
@@ -876,7 +879,7 @@ qq_normal + qq_gamma + qq_lognormal + qq_weibull
 ```
 
 ## (b) Action Downside Risk and Intervals
-For downside risk we used all studios: the 588 films with Action as their primary genre, released up to 2016, with a valid budget and positive revenue (zero revenue is also a placeholder). The sample 25th percentile of ROI is 0.91 (@tbl-task3-q25), so a quarter of Action films returned less than 91 cents of box office for every dollar of budget.
+For downside risk we used all studios: 588 of the 754 Action films (by primary genre, as in Task 1) released up to 2016, after excluding 97 with placeholder budgets and 69 with no reported revenue. The sample 25th percentile of ROI is 0.91 (@tbl-task3-q25), so a quarter of Action films returned less than 91 cents of box office for every dollar of budget.
 ```{r}
 #| label: task3-action-data
 
@@ -979,7 +982,7 @@ sim_q25 <- tibble(
 sim_q25_ci <- quantile(sim_q25$q25_roi, probs = c(0.025, 0.975))
 ```
 
-We estimated a 95% interval in two ways. The percentile bootstrap assumes only that the films are independent and representative of Action films. With seed 2420, we drew 5,000 resamples of the 588 ROI values with replacement, took each resample's 25th percentile, and used the 2.5th and 97.5th percentiles of these estimates as the interval. The model-based method assumes ROI is log-normal, a natural choice for a positive, right-skewed ratio. Fitting it by maximum likelihood gives meanlog = 0.482 and sdlog = 1.173, and a 25th percentile of 0.73. We simulated 5,000 samples of 588 films from this model (seed 2420), refitted the log-normal to each, and took the 2.5th and 97.5th percentiles of their 25th percentiles.
+We estimated a 95% interval in two ways. The percentile bootstrap assumes only that the films are independent and representative of Action films. With seed 2420, we drew 5,000 resamples of the 588 ROI values with replacement, took each resample's 25th percentile, and used the 2.5th and 97.5th percentiles of these estimates as the interval. The model-based method assumes ROI is log-normal, a natural choice for a positive, right-skewed ratio. Fitting it by maximum likelihood gives meanlog = 0.482 and sdlog = 1.173 (the mean and standard deviation of log ROI), and a 25th percentile of 0.73. We simulated 5,000 samples of 588 films from this model (seed 2420), refitted the log-normal to each, and took the 2.5th and 97.5th percentiles of their 25th percentiles.
 
 ```{r}
 #| label: tbl-task3-q25
@@ -1025,22 +1028,22 @@ action_comparison |>
 
 ```{r}
 #| label: fig-task3-action
-#| fig-cap: "Left: bootstrap distribution of the 25th percentile of Action-film ROI (solid line: sample estimate; dashed lines: 95% interval). Right: Q-Q plot of log ROI against the fitted log-normal model."
+#| fig-cap: "Left: bootstrap 25th percentiles of Action-film ROI (solid line: estimate; dashed lines: 95% interval). Right: Q-Q plot of log ROI against the fitted log-normal."
 #| fig-width: 7
 #| fig-height: 3.5
-#| out-width: "90%"
+#| out-width: "80%"
 #| fig-pos: "H"
 
 boot_q25_plot + action_qq_plot
 ```
 The two methods do not agree (@tbl-task3-q25): the bootstrap gives 0.91 (95% interval 0.80 to 1.05) and the model gives 0.73 (0.66 to 0.82). The intervals barely overlap, and the model's interval excludes the sample estimate. The most likely cause is the log-normal assumption. In the right panel of @fig-task3-action, the lowest points fall well below the line, so the worst Action flops lost far more of their budget than a log-normal would predict. These extremes drag meanlog down (0.48, against a median log ROI of 0.68) and inflate sdlog, pulling the model's 25th percentile below what the films show; its narrower interval reflects trust in that shape, not extra information. A percentile is unaffected by how extreme the worst values are, so with 588 films and a bootstrap distribution centred on the estimate (left panel), we prefer the bootstrap interval. 
-Two caveats apply: the bootstrap distribution is lumpy, as is usual for a percentile, and some of the worst flops may be revenue reporting errors; correcting those could only raise the 25th percentile, so 0.91 errs on the cautious side.
+Two caveats apply: the bootstrap distribution is lumpy, as is usual for a percentile, and the self-reported data cut both ways. If some extreme flops have understated revenue, correcting them would push the true figure up, while if the 69 films without reported revenue performed poorly, including them would push it down.
 
 ## (d) Finance Team Summary
 
-**Budget model.** We recommend the simulator use a gamma distribution with shape 1.382 and rate 0.031 per \$m. Of four shapes tested on 243 Universal films, using a model-comparison score (AIC) and visual checks, it fits best, including the few very expensive films, and it matches the average budget of about \$44.5m. A normal (bell-shaped) curve would even generate negative budgets.
+**Budget model.** We recommend the simulator use a gamma distribution with shape 1.382 and rate 0.031 per \$m. Of four shapes tested on 243 Universal films, using a model-comparison score (AIC) and visual checks, it fits best, including the few very expensive films, and it matches the average budget of about \$44.5m. A normal (bell-shaped) curve would even generate negative budgets. As the budgets go back to 1962 without inflation adjustment, the model probably understates today's costs.
 
-**Action downside risk.** Plan around an ROI of 0.91. Historically, one in four Action films earned less than 91 cents at the box office per dollar of budget, so roughly two of the eight contracted Action releases could fall below that level. The plausible range is 0.80 to 1.05, so use 0.80 for cautious stress tests. This figure comes from resampling the actual films; a fitted curve (0.73) did not match the worst results. ROI counts self-reported box office only, with no marketing costs, and budgets are not adjusted for inflation.
+**Action downside risk.** Plan around an ROI of 0.91. Historically, one in four Action films earned less than 91 cents at the box office per dollar of budget; if future releases follow that pattern, roughly two of the eight contracted Action releases could fall below that level. The plausible range is 0.80 to 1.05, so use 0.80 for cautious stress tests. This figure comes from resampling the actual films; a fitted curve (0.73) did not match the worst results. ROI counts self-reported box office only, with no marketing costs.
 
 {{< pagebreak >}}
 
