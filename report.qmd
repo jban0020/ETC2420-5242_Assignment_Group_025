@@ -1,35 +1,2003 @@
 ---
 title: "Meridian Pictures: Strategy and Slate Planning"
 subtitle: "ETC2420/5242 Group Assignment 2"
-author: "Group [Number]"
-date: "October 2026"
+author: "Group 025 — Joshua Bannon, Vikash Manoj, Shakshi Shah, Smit Tambat"
+date: "23 October 2026"
 format:
   pdf:
     toc: true
     number-sections: true
-    geometry:
-      - margin=2cm
-    fontsize: 11pt
 execute:
   warning: false
   message: false
+  echo: false
 ---
 
 # Task 1: Slate Health Check
 
-[Insert completed and reviewed Task 1.]
+```{r}
+#| label: task1-setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+library(patchwork)
+
+theme_set(theme_minimal(base_size = 9))
+
+focus_genres <- c(
+  "Action", "Comedy", "Drama",
+  "Horror", "Animation"
+)
+
+movies <- read_csv("data/movies.csv",
+                   show_col_types = FALSE)
+
+movies_clean <- movies |>
+  filter(!is.na(release_year),
+         release_year <= 2016) |>
+  mutate(
+    budget = if_else(budget < 10000, NA_real_, 
+                     as.numeric(budget)),
+    revenue = if_else(revenue <= 0, NA_real_,
+                      as.numeric(revenue)),
+    roi = if_else(
+      !is.na(budget) & !is.na(revenue),
+      revenue / budget,
+      NA_real_
+    ),
+    budget_m = budget / 1e6,
+    franchise_status = factor(
+      franchise_status,
+      levels = c("Original", "Franchise")
+    )
+  )
+
+movies_focus <- movies_clean |>
+  filter(primary_genre %in% focus_genres)
+
+franchise_summary <- movies_clean |>
+  count(franchise_status, name = "Films") |>
+  mutate(
+    Percentage = round(100 * Films / sum(Films), 1)
+  )
+```
+
+## Data Preparation and quality
+
+The course-provided dataset is based on The Movie Database [@tmdb]. Films released after 2016 are excluded, while budgets below $10,000 and zero revenues are treated as missing. ROI is recalculated as revenue divided by production budget. For genre comparisons, films are classified using their first-listed genre to prevent double-counting.
+
+```{r}
+#| label: task1-data-quality
+
+data_quality <- tibble(
+  Measure = c(
+    "Films in original dataset",
+    "Films in analysis period",
+    "Missing or invalid budgets",
+    "Missing or invalid revenues",
+    "Missing ROI values",
+    "Films with valid budget and ROI"
+  ),
+  Count = c(
+    nrow(movies),
+    nrow(movies_clean),
+    sum(is.na(movies_clean$budget)),
+    sum(is.na(movies_clean$revenue)),
+    sum(is.na(movies_clean$roi)),
+    sum(complete.cases(
+      movies_clean[, c("budget", "roi")]
+    ))
+  )
+)
+
+knitr::kable(
+  data_quality,
+  caption = "Data quality summary"
+)
+```
+
+```{r}
+#| label: task1-summary-table
+
+financial_summary <- tibble(
+  Variable = c("Production budget ($m)", "ROI (multiple)"),
+  N = c(
+    sum(!is.na(movies_clean$budget)),
+    sum(!is.na(movies_clean$roi))
+  ),
+  Mean = c(
+    mean(movies_clean$budget_m, na.rm = TRUE),
+    mean(movies_clean$roi, na.rm = TRUE)
+  ),
+  Median = c(
+    median(movies_clean$budget_m, na.rm = TRUE),
+    median(movies_clean$roi, na.rm = TRUE)
+  ),
+  SD = c(
+    sd(movies_clean$budget_m, na.rm = TRUE),
+    sd(movies_clean$roi, na.rm = TRUE)
+  ),
+  Q1 = c(
+    quantile(movies_clean$budget_m, 0.25, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.25, na.rm = TRUE)
+  ),
+  Q3 = c(
+    quantile(movies_clean$budget_m, 0.75, na.rm = TRUE),
+    quantile(movies_clean$roi, 0.75, na.rm = TRUE)
+  )
+) |>
+  mutate(
+    across(Mean:Q3, ~round(.x, 2))
+  )
+
+knitr::kable(
+  financial_summary,
+  caption = "Summary statistics for production budgets and ROI"
+)
+
+knitr::kable(
+  franchise_summary,
+  caption = "Franchise and Original film composition"
+)
+```
+
+Of 4,801 films in the analysis period, 1,070 have an invalid or missing budget, 1,425 have missing revenue and 1,587 have missing ROI. Financial results therefore reflect only films with usable values. The median budget is **$24 million** and median ROI is **2.30**; medians are more informative than means because a few films have unusually large values.
+
+## Overall Distributions
+
+```{r}
+#| label: fig-overall
+#| fig-cap: "Distribution of budgets and ROI, and film composition."
+#| fig-width: 8
+#| fig-height: 3
+
+p1 <- ggplot(
+  movies_clean |> filter(!is.na(budget_m)),
+  aes(x = budget_m)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#3478A8",
+    colour = "white"
+  ) +
+  scale_x_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Budget ($m)",
+    y = "Number of films"
+  )
+
+p2 <- ggplot(
+  movies_clean |> filter(!is.na(roi), roi > 0),
+  aes(x = roi)
+) +
+  geom_histogram(
+    bins = 45,
+    fill = "#269C8C",
+    colour = "white"
+  ) +
+  geom_vline(
+    xintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  scale_x_log10(
+    labels = scales::label_number()
+  ) +
+  labs(
+    x = "ROI (log scale)",
+    y = "Number of films"
+  )
+
+p3 <- ggplot(
+  franchise_summary,
+  aes(x = franchise_status,
+      y = Films,
+      fill = franchise_status)
+) +
+  geom_col(width = 0.65) +
+  geom_text(
+    aes(label = paste0(Percentage, "%")),
+    vjust = -0.5
+  ) +
+  scale_fill_manual(
+    values = c("Original" = "#3478A8",
+               "Franchise" = "#E59B46")
+  ) +
+  labs(
+    x = "Film type",
+    y = "Number of films"
+  ) +
+  guides(fill = "none") +
+  expand_limits(y = max(franchise_summary$Films) * 1.1)
+
+(p1 + p2 + p3)
+```
+
+Budgets are right-skewed, with most films concentrated at the lower end. ROI is also highly skewed, so it is displayed on a log scale; the dashed line marks revenue equal to budget (ROI = 1). **Original films make up 94.6%** of the dataset, compared with **5.4% franchises**.
+
+## Differences Across Genres
+
+```{r}
+#| label: fig-genres
+#| fig-cap: "Budgets, ROI and franchise composition across the five focus genres."
+#| fig-width: 7.3
+#| fig-height: 3
+p4 <- ggplot(
+  movies_focus |> filter(!is.na(budget_m)),
+  aes(
+    x = reorder(primary_genre, budget_m,
+                FUN = median),
+    y = budget_m,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Budget ($m)"
+  )
+
+p5 <- ggplot(
+  movies_focus |> filter(!is.na(roi), roi > 0),
+  aes(
+    x = reorder(primary_genre, roi, FUN = median),
+    y = roi,
+    fill = primary_genre
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  coord_flip() +
+  scale_y_log10() +
+  labs(
+    x = "Primary genre",
+    y = "ROI (log scale)"
+  )
+
+p6 <- ggplot(
+  movies_focus,
+  aes(
+    x = primary_genre,
+    fill = franchise_status
+  )
+) +
+  geom_bar(
+    position = "fill",
+    width = 0.7
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Primary genre",
+    y = "Share of films",
+    fill = "Film type"
+  ) +
+  theme(
+  axis.text.x = element_text(angle = 45, hjust = 1)
+)
+
+(p4 + p5 + p6) + plot_layout(ncol = 3)
+```
+
+Animation and action generally have higher production budgets, while horror and drama tend to be lower-budget. ROI overlaps substantially across genres, suggesting that a larger budget does not guarantee a greater revenue-to-budget multiple. Franchise shares also vary by genre, although original films dominate all five groups.
+
+## Changes over time
+
+```{r}
+#| label: fig-trends
+#| fig-cap: "Median budgets, median ROI and film composition by release year, 1990–2016."
+#| fig-width: 7.3
+#| fig-height: 3
+
+budget_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_budget = median(budget_m, na.rm = TRUE),
+    n_valid = sum(!is.na(budget_m)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+p7 <- ggplot(
+  budget_trend,
+  aes(x = release_year, y = median_budget)
+) +
+  geom_line(colour = "#3478A8", linewidth = 1) +
+  geom_point(colour = "#3478A8", size = 1.5) +
+  scale_y_continuous(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median budget ($m)"
+  )
+
+roi_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  group_by(release_year) |>
+  summarise(
+    median_roi = median(roi, na.rm = TRUE),
+    n_valid = sum(!is.na(roi)),
+    .groups = "drop"
+  ) |>
+  filter(n_valid >= 5)
+
+p8 <- ggplot(
+  roi_trend,
+  aes(x = release_year, y = median_roi)
+) +
+  geom_line(colour = "#269C8C", linewidth = 1) +
+  geom_point(colour = "#269C8C", size = 1.5) +
+  geom_hline(
+    yintercept = 1,
+    linetype = "dashed",
+    colour = "firebrick"
+  ) +
+  labs(
+    x = "Release year",
+    y = "Median ROI (multiple)"
+  )
+
+franchise_trend <- movies_clean |>
+  filter(release_year >= 1990) |>
+  count(release_year, franchise_status) |>
+  group_by(release_year) |>
+  mutate(
+    percentage = n / sum(n)
+  ) |>
+  ungroup()
+
+p9 <- ggplot(
+  franchise_trend,
+  aes(
+    x = release_year,
+    y = percentage,
+    fill = franchise_status
+  )
+) +
+  geom_col(width = 0.9) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Original" = "#3478A8",
+      "Franchise" = "#E59B46"
+    )
+  ) +
+  labs(
+    x = "Release year",
+    y = "Share of films",
+    fill = "Film type"
+  )
+
+(p7 + p8) / p9 +
+  plot_layout(heights = c(1, 0.8))
+```
+
+Between 1990 and 2016, median production budgets fluctuate without a consistent upward trend. Median ROI also varies considerably across release years but generally remains above one, indicating that reported box-office revenues typically exceed production budgets. Original productions dominate the slate throughout the period, although the proportion of franchises changes between years. These patterns suggest that production costs and returns vary over time, without establishing a consistent shift towards franchises.
+
+## Summary for the Head of Production
+
+The dataset is dominated by original films, with relatively few franchises. Typical production budgets are well below the largest blockbuster budgets, while ROI varies considerably between films. This makes the median more useful than the mean for describing a typical project.
+
+Production scale differs across genres: action and animation tend to need larger budgets, while horror and drama often operate at lower levels. ROI remains variable within every genre, so genre or budget alone should not be treated as a reliable predictor of financial success.
+
+Finally, missing financial values are substantial: only **3,214 films** have both a valid budget and ROI. Comparisons should be viewed as exploratory, especially because box-office revenue is not the same as studio profit and ROI here does not deduct marketing or distribution costs.
 
 # Task 2: Franchise vs. Original: Investment Strategy
 
-[Insert completed and reviewed Task 2.]
+## Introduction
+
+Meridian Pictures must decide how to balance investment between Original films and Franchise films. This analysis compares their production budget distributions, estimates the difference in median budgets, and considers what the evidence implies for future investment decisions.
+
+The analysis uses films released by the end of 2016. Films with missing release years and films released after 2016 were excluded. Budgets below \$10,000 and nonpositive revenue values were treated as missing, consistent with the dataset documentation. The comparison uses all films with valid budget information and a known franchise classification, rather than restricting the analysis to the five focus genres.
+
+```{r}
+#| label: task2-setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 11))
+
+movies <- read_csv(
+  "data/movies.csv",
+  show_col_types = FALSE
+)
+
+movies_clean <- movies |>
+  filter(
+    !is.na(release_year),
+    release_year <= 2016
+  ) |>
+  mutate(
+    budget = if_else(
+      budget < 10000,
+      NA_real_,
+      as.numeric(budget)
+    ),
+    revenue = if_else(
+      revenue <= 0,
+      NA_real_,
+      as.numeric(revenue)
+    ),
+    roi = if_else(
+      !is.na(budget) & !is.na(revenue),
+      revenue / budget,
+      NA_real_
+    ),
+    budget_m = budget / 1e6,
+    franchise_status = factor(
+      franchise_status,
+      levels = c("Original", "Franchise")
+    )
+  )
+```
+
+## Budget Distribution Comparison
+
+```{r}
+#| label: fig-task2-budget-comparison
+#| fig-cap: "Production budget distributions for Original and Franchise films."
+#| fig-width: 7
+#| fig-height: 5
+
+ggplot(
+  movies_clean |>
+    filter(
+      !is.na(budget_m),
+      budget_m > 0,
+      !is.na(franchise_status)
+    ),
+  aes(
+    x = franchise_status,
+    y = budget_m,
+    fill = franchise_status
+  )
+) +
+  geom_boxplot(
+    outlier.alpha = 0.2,
+    show.legend = FALSE
+  ) +
+  scale_y_log10(
+    labels = scales::label_dollar(suffix = "m")
+  ) +
+  labs(
+    x = "Film classification",
+    y = "Production budget (USD millions)"
+  )
+```
+
+The boxplots suggest that Franchise films generally have higher production budgets than Original films, as shown by the higher median budget. The Franchise group also has a wider interquartile range on the displayed logarithmic scale, indicating greater variation in the middle 50% of its budgets on a multiplicative scale. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in that group. However, the distributions overlap, so the difference is not absolute: some Original films have budgets comparable to those of Franchise films. These visual findings will be assessed further using a confidence interval for the difference in median budgets.
+
+```{r}
+#| label: task2-budget-summary
+
+budget_summary <- movies_clean |>
+  filter(
+    !is.na(budget_m),
+    budget_m > 0,
+    !is.na(franchise_status)
+  ) |>
+  group_by(franchise_status) |>
+  summarise(
+    sample_size = n(),
+    median_budget_m = median(budget_m),
+    .groups = "drop"
+  )
+
+budget_summary |>
+  gt::gt() |>
+  gt::fmt_number(
+    columns = median_budget_m,
+    decimals = 2
+  ) |>
+  gt::cols_label(
+    franchise_status = "Film classification",
+    sample_size = "Sample size",
+    median_budget_m = "Median budget (USD millions)"
+  )
+```
+
+## Interval Estimation
+
+```{r}
+#| label: task2-bootstrap-data
+
+original_budgets <- movies_clean |>
+  filter(
+    franchise_status == "Original",
+    !is.na(budget_m),
+    budget_m > 0
+  ) |>
+  pull(budget_m)
+
+franchise_budgets <- movies_clean |>
+  filter(
+    franchise_status == "Franchise",
+    !is.na(budget_m),
+    budget_m > 0
+  ) |>
+  pull(budget_m)
+```
+
+```{r}
+#| label: task2-bootstrap-results
+
+set.seed(5242)
+
+bootstrap_results <- tibble(
+  replicate = 1:1000
+) |>
+  mutate(
+    boot_diff = map_dbl(replicate, function(i) {
+      original_boot <- sample(
+        x = original_budgets,
+        size = length(original_budgets),
+        replace = TRUE
+      )
+      
+      franchise_boot <- sample(
+        x = franchise_budgets,
+        size = length(franchise_budgets),
+        replace = TRUE
+      )
+      
+      median(franchise_boot) - median(original_boot)
+    })
+  )
+```
+
+```{r}
+#| label: task2-bootstrap-ci
+
+bootstrap_ci <- bootstrap_results |>
+  summarise(
+    lower = quantile(boot_diff, probs = 0.025),
+    upper = quantile(boot_diff, probs = 0.975)
+  )
+
+bootstrap_ci
+```
+
+To estimate the uncertainty in the difference between median production budgets, we used a bootstrap percentile method with 1,000 resamples. In each resample, budgets were sampled with replacement separately for Original and Franchise films, preserving the sample size of each group. The difference between the resampled medians was calculated as Franchise minus Original, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to obtain a 95% interval estimate. The resulting interval was approximately **\$9.00 million to \$25.03 million**, compared with an observed median budget difference of \$18 million. As the interval lies entirely above zero, the results provide evidence that Franchise films have a higher median production budget than Original films.
+
+```{r}
+#| label: task2-revenue-summary
+
+revenue_summary <- movies_clean |>
+  filter(
+    !is.na(revenue),
+    !is.na(franchise_status)
+  ) |>
+  group_by(franchise_status) |>
+  summarise(
+    films_with_revenue = n(),
+    total_revenue = sum(revenue),
+    median_revenue = median(revenue),
+    .groups = "drop"
+  ) |>
+  mutate(
+    revenue_share = total_revenue / sum(total_revenue) * 100
+  )
+
+revenue_summary |>
+  gt::gt() |>
+  gt::fmt_number(
+    columns = films_with_revenue,
+    decimals = 0
+  ) |>
+  gt::fmt_number(
+    columns = c(total_revenue, median_revenue),
+    decimals = 0
+  ) |>
+  gt::fmt_number(
+    columns = revenue_share,
+    decimals = 1
+  ) |>
+  gt::cols_label(
+    franchise_status = "Film classification",
+    films_with_revenue = "Films with reported revenue",
+    total_revenue = "Total revenue (USD)",
+    median_revenue = "Median revenue (USD)",
+    revenue_share = "Share of reported revenue (%)"
+  )
+```
+
+## Discussion
+
+The findings partially support leadership's concern about the allocation of production budgets. Franchise films had a median budget of \$40 million, compared with \$22 million for Original films, and the 95% bootstrap confidence interval for the difference in medians (Franchise minus Original) was approximately \$9.00 million to \$25.03 million. As this interval lies entirely above zero, the results support a higher median budget for Franchise films. However, the budget distributions overlap, so not all Original films have smaller budgets than Franchise films.
+
+The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data. The unequal group sizes also affect the comparison of total revenue, while the greater concentration of revenue among the top five Franchise films suggests that the group total is more sensitive to a small number of high-performing films.
+
+These revenue figures do not account for production or marketing costs and therefore cannot establish which group is more profitable.
+
+## Investment Strategy Recommendations
+
+Meridian should gradually increase its investment in Original films while maintaining a core portfolio of established franchises. Rather than allocating budgets based solely on whether a project belongs to a franchise, the studio should assess each film according to its expected financial returns, production costs, commercial potential and contribution to creative diversity. Original projects could be developed through a range of budget levels, allowing Meridian to explore new concepts without committing substantial resources to every untested idea.
+
+Over the next decade, Meridian should evaluate the performance of both categories using profitability and return on investment, rather than revenue alone. It should also monitor the financial performance of new Original projects over time and adjust its investment allocations as evidence accumulates. This approach would allow the studio to pursue its creative-diversity goals while retaining established franchises as part of its investment portfolio. The available analysis does not establish an optimal budget allocation between the two categories, so Meridian should use ongoing performance reviews to guide future decisions rather than commit to a fixed proportion in advance.
 
 # Task 3: Modelling Budgets and Downside Risk
 
-[Insert completed and reviewed Task 3.]
+```{r}
+#| label: task3-setup
+#| include: false
+
+library(tidyverse)
+library(gt)
+library(patchwork)
+library(scales)
+library(MASS)
+
+knitr::opts_chunk$set(echo = knitr::is_html_output())
+
+movies <- read_csv("data/movies.csv")
+```
+
+## Introduction
+Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
+
+## Universal Pictures Budget Modelling
+We used the 243 Universal Pictures films (by `primary_company`) released up to 2016 with a valid budget, treating budgets under \$10,000 as missing-data placeholders. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
+
+```{r}
+#| label: task3-universal-data
+
+universal_films <- movies |>
+  filter(
+    release_year <= 2016,
+    primary_company == "Universal Pictures",
+    budget >= 10000
+  ) |>
+  mutate(
+    budget_m = budget / 1000000
+  )
+```
+
+```{r}
+#| label: task3-universal-hist
+#| include: !expr knitr::is_html_output()
+
+ggplot(universal_films, aes(x = budget_m)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 25
+  ) +
+  labs(
+    x = "Production budget ($m)",
+    y = "Density",
+    title = "Universal Pictures production budgets"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: task3-universal-fits
+
+universal_normal <- fitdistr(
+  universal_films$budget_m,
+  densfun = "normal"
+)
+
+universal_gamma <- fitdistr(
+  universal_films$budget_m,
+  densfun = "gamma"
+)
+
+universal_lognormal <- fitdistr(
+  universal_films$budget_m,
+  densfun = "lognormal"
+)
+
+universal_weibull <- fitdistr(
+  universal_films$budget_m,
+  densfun = "weibull"
+)
+```
+
+
+## Model Diagnostics and Comparison
+
+```{r}
+#| label: tbl-task3-aic
+#| tbl-cap: "Distributions fitted to Universal Pictures budgets, ordered by AIC (lowest first)"
+#| tbl-cap-location: bottom
+#| tbl-pos: "H"
+
+universal_comparison <- tibble(
+  model = c(
+    "Normal",
+    "Gamma",
+    "Log-normal",
+    "Weibull"
+  ),
+  parameters = c(
+    "mean, sd ($m)",
+    "shape, rate (per $m)",
+    "meanlog, sdlog (log $m)",
+    "shape, scale ($m)"
+  ),
+  estimate_1 = c(
+    universal_normal$estimate["mean"],
+    universal_gamma$estimate["shape"],
+    universal_lognormal$estimate["meanlog"],
+    universal_weibull$estimate["shape"]
+  ),
+  estimate_2 = c(
+    universal_normal$estimate["sd"],
+    universal_gamma$estimate["rate"],
+    universal_lognormal$estimate["sdlog"],
+    universal_weibull$estimate["scale"]
+  ),
+  log_likelihood = c(
+    universal_normal$loglik,
+    universal_gamma$loglik,
+    universal_lognormal$loglik,
+    universal_weibull$loglik
+  ),
+  aic = c(
+    AIC(universal_normal),
+    AIC(universal_gamma),
+    AIC(universal_lognormal),
+    AIC(universal_weibull)
+  )
+) |>
+  arrange(desc(log_likelihood))
+
+universal_comparison |>
+  gt() |>
+  tab_options(table.width = pct(100)) |>
+  cols_label(
+    model = "Distribution",
+    parameters = "Parameters (units)",
+    estimate_1 = "Estimate 1",
+    estimate_2 = "Estimate 2",
+    log_likelihood = "Log-likelihood",
+    aic = "AIC"
+  ) |>
+  fmt_number(
+    columns = c(estimate_1, estimate_2),
+    decimals = 3
+  ) |>
+  fmt_number(
+    columns = c(log_likelihood, aic),
+    decimals = 1
+  )
+```
+
+AIC rewards a close fit but penalises extra parameters, so lower is better. As all four distributions have two parameters, the ranking in @tbl-task3-aic reflects fit alone. The gamma has the lowest AIC (2320.1), with the Weibull effectively tied (2320.6); the log-normal is 29 points worse and the normal is far behind (2454.1). AIC cannot separate the top two or show whether either fits well, so we also used Q-Q plots.
+
+In @fig-task3-qq, the normal curves away at both ends: its lowest theoretical quantiles are negative (it gives about a 12% chance of a negative budget), and the largest budgets sit well above the line, so it understates expensive films. The log-normal errs the other way: its top theoretical quantile is over \$500m, against Universal's actual maximum of \$209m. The gamma and Weibull both track the line, but for the biggest budgets the Weibull points drift above it while the gamma stays close. As large budgets drive Finance's exposure, and the gamma also has the lowest AIC, we recommend the gamma distribution (shape 1.382, rate 0.031 per \$m).
+
+```{r}
+#| label: fig-task3-qq
+#| fig-cap: "Q-Q plots of Universal Pictures budgets against each fitted distribution. Points close to the line indicate a good fit."
+#| fig-width: 7
+#| fig-height: 5
+#| out-width: "85%"
+#| fig-pos: "H"
+
+qq_normal <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qnorm,
+    dparams = as.list(universal_normal$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qnorm,
+    dparams = as.list(universal_normal$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Normal"
+  ) +
+  theme_minimal()
+
+qq_gamma <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qgamma,
+    dparams = as.list(universal_gamma$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qgamma,
+    dparams = as.list(universal_gamma$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Gamma"
+  ) +
+  theme_minimal()
+
+qq_lognormal <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qlnorm,
+    dparams = as.list(universal_lognormal$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qlnorm,
+    dparams = as.list(universal_lognormal$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Log-normal"
+  ) +
+  theme_minimal()
+
+qq_weibull <-
+  ggplot(universal_films, aes(sample = budget_m)) +
+  stat_qq(
+    distribution = qweibull,
+    dparams = as.list(universal_weibull$estimate)
+  ) +
+  stat_qq_line(
+    distribution = qweibull,
+    dparams = as.list(universal_weibull$estimate)
+  ) +
+  labs(
+    x = "Theoretical quantiles ($m)",
+    y = "Observed budgets ($m)",
+    title = "Weibull"
+  ) +
+  theme_minimal()
+
+qq_normal + qq_gamma + qq_lognormal + qq_weibull
+```
+
+## Action Genre Downside Risk
+For downside risk we used all studios: the 588 films with Action as their primary genre, released up to 2016, with a valid budget and positive revenue (zero revenue is also a placeholder). The sample 25th percentile of ROI is 0.91 (@tbl-task3-q25), so a quarter of Action films returned less than 91 cents of box office for every dollar of budget.
+```{r}
+#| label: task3-action-data
+
+action_films <- movies |>
+  filter(
+    release_year <= 2016,
+    primary_genre == "Action",
+    budget >= 10000,
+    revenue > 0
+  ) |>
+  mutate(
+    roi = revenue / budget
+  )
+
+action_q25 <- quantile(action_films$roi, probs = 0.25)
+```
+
+```{r}
+#| label: task3-action-bootstrap
+
+set.seed(2420)
+
+B <- 5000
+
+boot_q25 <- tibble(
+  simulation = 1:B,
+  q25_roi = replicate(B, {
+    boot_sample <- sample(action_films$roi, size = nrow(action_films), replace = TRUE)
+    quantile(boot_sample, probs = 0.25)
+  })
+)
+
+boot_q25_ci <- quantile(boot_q25$q25_roi, probs = c(0.025, 0.975))
+
+boot_q25_plot <- boot_q25 |>
+  ggplot(aes(x = q25_roi)) +
+  geom_histogram(bins = 35, boundary = 0) +
+  geom_vline(xintercept = action_q25, linewidth = 1) +
+  geom_vline(xintercept = boot_q25_ci, linetype = "dashed", linewidth = 1) +
+  labs(
+    title = "Bootstrap 25th percentiles",
+    x = "Bootstrap 25th percentile of ROI",
+    y = "Number of bootstrap samples"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: task3-action-lognormal
+
+action_lognormal <- fitdistr(
+  action_films$roi,
+  densfun = "lognormal"
+)
+
+action_qq_plot <-
+  ggplot(action_films, aes(sample = log(roi))) +
+  stat_qq(
+    distribution = qnorm,
+    dparams = list(
+      mean = action_lognormal$estimate["meanlog"],
+      sd = action_lognormal$estimate["sdlog"]
+    )
+  ) +
+  stat_qq_line(
+    distribution = qnorm,
+    dparams = list(
+      mean = action_lognormal$estimate["meanlog"],
+      sd = action_lognormal$estimate["sdlog"]
+    )
+  ) +
+  labs(
+    x = "Theoretical quantiles (log ROI)",
+    y = "Observed log ROI",
+    title = "Log-normal check (log scale)"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: task3-action-model
+
+action_q25_model <- qlnorm(
+  0.25,
+  meanlog = action_lognormal$estimate["meanlog"],
+  sdlog = action_lognormal$estimate["sdlog"]
+)
+
+set.seed(2420)
+
+sim_q25 <- tibble(
+  simulation = 1:B,
+  q25_roi = replicate(B, {
+    sim_sample <- rlnorm(nrow(action_films), meanlog = action_lognormal$estimate["meanlog"], sdlog = action_lognormal$estimate["sdlog"])
+    sim_fit <- fitdistr(sim_sample, densfun = "lognormal")
+    qlnorm(0.25, meanlog = sim_fit$estimate["meanlog"], sdlog = sim_fit$estimate["sdlog"])
+  })
+)
+
+sim_q25_ci <- quantile(sim_q25$q25_roi, probs = c(0.025, 0.975))
+```
+
+We estimated a 95% interval in two ways. The percentile bootstrap assumes only that the films are independent and representative of Action films. With seed 2420, we drew 5,000 resamples of the 588 ROI values with replacement, took each resample's 25th percentile, and used the 2.5th and 97.5th percentiles of these estimates as the interval. The model-based method assumes ROI is log-normal, a natural choice for a positive, right-skewed ratio. Fitting it by maximum likelihood gives meanlog = 0.482 and sdlog = 1.173, and a 25th percentile of 0.73. We simulated 5,000 samples of 588 films from this model (seed 2420), refitted the log-normal to each, and took the 2.5th and 97.5th percentiles of their 25th percentiles.
+
+```{r}
+#| label: tbl-task3-q25
+#| tbl-cap: "95% interval estimates for the 25th percentile of ROI for Action films, from two methods"
+#| tbl-cap-location: bottom
+#| tbl-pos: "H"
+
+action_comparison <- tibble(
+  method = c(
+    "Percentile bootstrap",
+    "Fitted log-normal model"
+  ),
+  estimate = c(
+    action_q25,
+    action_q25_model
+  ),
+  lower = c(
+    boot_q25_ci[1],
+    sim_q25_ci[1]
+  ),
+  upper = c(
+    boot_q25_ci[2],
+    sim_q25_ci[2]
+  )
+)
+
+action_comparison |>
+  gt() |>
+  tab_options(table.width = pct(100)) |>
+  cols_label(
+    method = "Method",
+    estimate = "25th percentile of ROI",
+    lower = "95% lower",
+    upper = "95% upper"
+  ) |>
+  fmt_number(
+    columns = c(estimate, lower, upper),
+    decimals = 2
+  )
+```
+
+## Comparison of Interval Estimates
+
+```{r}
+#| label: fig-task3-action
+#| fig-cap: "Left: bootstrap distribution of the 25th percentile of Action-film ROI (solid line: sample estimate; dashed lines: 95% interval). Right: Q-Q plot of log ROI against the fitted log-normal model."
+#| fig-width: 7
+#| fig-height: 3.5
+#| out-width: "90%"
+#| fig-pos: "H"
+
+boot_q25_plot + action_qq_plot
+```
+The two methods do not agree (@tbl-task3-q25): the bootstrap gives 0.91 (95% interval 0.80 to 1.05) and the model gives 0.73 (0.66 to 0.82). The intervals barely overlap, and the model's interval excludes the sample estimate. The most likely cause is the log-normal assumption. In the right panel of @fig-task3-action, the lowest points fall well below the line, so the worst Action flops lost far more of their budget than a log-normal would predict. These extremes drag meanlog down (0.48, against a median log ROI of 0.68) and inflate sdlog, pulling the model's 25th percentile below what the films show; its narrower interval reflects trust in that shape, not extra information. A percentile is unaffected by how extreme the worst values are, so with 588 films and a bootstrap distribution centred on the estimate (left panel), we prefer the bootstrap interval. 
+Two caveats apply: the bootstrap distribution is lumpy, as is usual for a percentile, and some of the worst flops may be revenue reporting errors; correcting those could only raise the 25th percentile, so 0.91 errs on the cautious side.
+
+## Summary for the Finance Team
+
+**Budget model.** We recommend the simulator use a gamma distribution with shape 1.382 and rate 0.031 per \$m. Of four shapes tested on 243 Universal films, using a model-comparison score (AIC) and visual checks, it fits best, including the few very expensive films, and it matches the average budget of about \$44.5m. A normal (bell-shaped) curve would even generate negative budgets.
+
+**Action downside risk.** Plan around an ROI of 0.91. Historically, one in four Action films earned less than 91 cents at the box office per dollar of budget, so roughly two of the eight contracted Action releases could fall below that level. The plausible range is 0.80 to 1.05, so use 0.80 for cautious stress tests. This figure comes from resampling the actual films; a fitted curve (0.73) did not match the worst results. ROI counts self-reported box office only, with no marketing costs, and budgets are not adjusted for inflation.
 
 # Task 4: Building a Greenlight Risk Model
 
-[Insert completed and reviewed Task 4.]
+## Introduction
+
+This analysis examines whether information available before production can help Meridian identify films at risk of failing to recover their budgets. Frequentist and Bayesian logistic regression models were fitted using genre, franchise status, budget and crew size. The results are used to assess classification performance and estimate financial risk for three hypothetical film proposals.
+
+## Outcome and Predictor Definitions
+
+```{r}
+#| label: task4-outcome
+#| include: false
+
+# movies_clean was created in the shared setup chunk.
+
+task4_data <- movies_clean |>
+  mutate(
+    flop = case_when(
+      is.na(roi) ~ NA_integer_,
+      roi < 1 ~ 1L,
+      TRUE ~ 0L      
+    )
+  )
+
+# Check the outcome categories.
+task4_data |>
+  count(flop, name = "number_of_films")
+```
+
+```{r}
+#| label: task4-data-checks
+#| include: false
+
+# Check missing values in the selected predictors.
+task4_data |>
+  summarise(
+    missing_genre = sum(is.na(primary_genre)),
+    missing_franchise = sum(is.na(franchise_status)),
+    missing_budget = sum(is.na(budget_m)),
+    missing_crew = sum(is.na(crew_size))
+  )
+
+# Count films with complete information for modelling.
+task4_data |>
+  summarise(
+    complete_model_cases = sum(
+      complete.cases(
+        flop,
+        primary_genre,
+        franchise_status,
+        budget_m,
+        crew_size
+      )
+    )
+  )
+```
+
+Financial risk was assessed using return on investment (ROI), calculated as box-office revenue divided by production budget. A film was classified as a *flop* when its ROI was below 1, indicating that reported revenue did not recover the production budget. Films with an ROI of 1 or higher were classified as *non-flops*, while those with missing ROI were left unclassified.
+
+Of the 4,801 films examined, 785 were identified as flops and 2,429 as non-flops, with the remaining 1,587 lacking sufficient financial information for classification. Among the 3,214 films with known outcomes, the observed flop rate was approximately 24.4%.
+
+Logistic regression was selected because the outcome is binary, allowing the model to estimate the probability of a film flopping while keeping predicted values between 0 and 1. Linear regression is less appropriate because its predictions are not restricted to this range, whereas Poisson regression is primarily designed for count outcomes rather than binary classifications.
+
+The proposed predictors were primary genre, franchise status, production budget and crew size, as these characteristics can reasonably be considered before a film receives production approval. After accounting for missing outcome and predictor information, 3,213 films had complete observations available for modelling. However, the substantial amount of missing financial data remains an important limitation, as films with recorded outcomes may not be representative of the wider dataset, potentially introducing selection bias.
+
+## Frequentist Logistic Regression
+
+```{r}
+#| label: task4-initial-model
+#| include: false
+
+task4_initial_model <- glm(
+  flop ~ primary_genre + franchise_status + budget_m + crew_size,
+  data = task4_data,
+  family = binomial
+)
+
+summary(task4_initial_model)
+```
+
+```{r}
+#| label: task4-genre-diagnostic
+#| include: false
+
+task4_data |>
+  filter(!is.na(flop), !is.na(primary_genre)) |>
+  count(primary_genre, flop) |>
+  tidyr::pivot_wider(
+    names_from = flop,
+    values_from = n,
+    values_fill = 0,
+    names_prefix = "flop_"
+  ) |>
+  mutate(total = flop_0 + flop_1) |>
+  arrange(total)
+```
+
+```{r}
+#| label: task4-model-data
+#| include: false
+
+task4_model_data <- task4_data |>
+  mutate(
+    budget_10m = budget_m / 10,
+    crew_10 = crew_size / 10
+  ) |>
+  filter(
+    complete.cases(
+      flop,
+      primary_genre,
+      franchise_status,
+      budget_10m,
+      crew_10
+    )
+  )
+```
+
+```{r}
+#| label: task4-frequentist-model
+#| include: false
+
+task4_frequentist <- glm(
+  flop ~ primary_genre + franchise_status + budget_10m + crew_10,
+  data = task4_model_data,
+  family = binomial
+)
+
+summary(task4_frequentist)
+```
+
+```{r}
+#| label: task4-frequentist-odds
+#| include: false
+
+odds_ratios <- exp(coef(task4_frequentist))
+
+wald_intervals <- confint.default(task4_frequentist)
+
+task4_odds_table <- data.frame(
+  Predictor = names(odds_ratios),
+  Odds_Ratio = odds_ratios,
+  CI_Lower = exp(wald_intervals[, 1]),
+  CI_Upper = exp(wald_intervals[, 2])
+)
+
+task4_odds_table |>
+  dplyr::mutate(
+    dplyr::across(
+      c(Odds_Ratio, CI_Lower, CI_Upper),
+      ~ round(.x, 3)
+    )
+  ) |>
+  print(row.names = FALSE)
+```
+
+```{r}
+#| label: task4-frequentist-results
+#| echo: false
+
+task4_odds_table |>
+  dplyr::filter(
+    Predictor %in% c(
+      "franchise_statusFranchise",
+      "budget_10m",
+      "crew_10"
+    )
+  ) |>
+  dplyr::mutate(
+    Predictor = dplyr::recode(
+      Predictor,
+      franchise_statusFranchise = "Franchise (vs original)",
+      budget_10m = "Budget (+$10 million)",
+      crew_10 = "Crew (+10 members)"
+    ),
+    dplyr::across(
+      c(Odds_Ratio, CI_Lower, CI_Upper),
+      ~ round(.x, 3)
+    )
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Predictor",
+      "Odds ratio",
+      "95% CI lower",
+      "95% CI upper"
+    ),
+    caption = "Selected frequentist logistic regression results"
+  )
+```
+**Interpretation**
+
+The frequentist logistic regression was fitted using 3,213 films with complete information. After accounting for genre, budget and crew size, franchise films had approximately 77.6% lower odds of flopping than original films (OR = 0.224, 95% CI: 0.126–0.399). A further $10 million in budget was associated with 4.0% lower odds of flopping (OR = 0.960, 95% CI: 0.936–0.985), while an additional 10 crew members was associated with 9.4% lower odds (OR = 0.906, 95% CI: 0.877–0.936). These findings suggest that franchise status, budget and crew size are associated with financial outcomes, although they do not establish causal relationships.
+
+**Limitations**
+
+The model has two important limitations. First, the Foreign genre contained only one film with a known outcome, which was a flop. This resulted in complete separation and an unstable coefficient, making its estimated odds ratio unreliable. Second, the analysis used 3,213 of the original 4,801 films because observations with missing information were excluded. If missing financial data are not random, the estimated relationships may not represent all films. These limitations should be considered when interpreting the results and comparing them with the Bayesian model.
+
+## Bayesian Logistic Regression
+
+```{r}
+#| label: task4-bayesian-data-checks
+#| include: false
+
+# Outcome balance
+task4_model_data |>
+  dplyr::count(flop) |>
+  dplyr::mutate(proportion = n / sum(n))
+
+# Number of flops and non-flops in each genre
+task4_model_data |>
+  dplyr::group_by(primary_genre) |>
+  dplyr::summarise(
+    films = dplyr::n(),
+    flops = sum(flop == 1),
+    non_flops = sum(flop == 0),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(films)
+
+# Predictor scales
+task4_model_data |>
+  dplyr::summarise(
+    budget_sd = sd(budget_10m),
+    crew_sd = sd(crew_10),
+    budget_median = median(budget_10m),
+    crew_median = median(crew_10),
+    budget_max = max(budget_10m),
+    crew_max = max(crew_10)
+  )
+```
+
+```{r}
+#| label: task4-bayesian-predictors
+#| include: false
+
+task4_budget_mean <- mean(task4_model_data$budget_10m)
+task4_budget_sd <- sd(task4_model_data$budget_10m)
+
+task4_crew_mean <- mean(task4_model_data$crew_10)
+task4_crew_sd <- sd(task4_model_data$crew_10)
+
+task4_bayesian_data <- task4_model_data |>
+  dplyr::mutate(
+    budget_z = (budget_10m - task4_budget_mean) /
+      task4_budget_sd,
+    crew_z = (crew_10 - task4_crew_mean) /
+      task4_crew_sd
+  )
+
+summary(task4_bayesian_data[, c("budget_z", "crew_z")])
+```
+
+```{r}
+#| label: task4-bayesian-prior-check
+#| include: false
+
+set.seed(2420)
+
+# Draw hypothetical coefficients from proposed priors
+prior_intercept <- 2.5 * rt(10000, df = 3)
+prior_franchise <- rnorm(10000, mean = 0, sd = 1.5)
+prior_budget <- rnorm(10000, mean = 0, sd = 0.5)
+prior_crew <- rnorm(10000, mean = 0, sd = 0.5)
+
+# Illustrative profile: original film with average budget and crew
+prior_prob_original <- plogis(prior_intercept)
+
+# Illustrative profile: franchise film with average budget and crew
+prior_prob_franchise <- plogis(
+  prior_intercept + prior_franchise
+)
+
+# Summarise implied prior probabilities
+rbind(
+  Original = quantile(
+    prior_prob_original,
+    c(0.025, 0.5, 0.975)
+  ),
+  Franchise = quantile(
+    prior_prob_franchise,
+    c(0.025, 0.5, 0.975)
+  )
+)
+```
+
+```{r}
+#| label: task4-bayesian-prior-comparison
+#| include: false
+
+set.seed(2420)
+
+n_draws <- 10000
+
+# Candidate intercept priors
+intercept_a <- 2.5 * rt(n_draws, df = 3)
+intercept_b <- rnorm(n_draws, mean = -1, sd = 1)
+
+# Other coefficient priors
+franchise_effect <- rnorm(n_draws, 0, 1.5)
+budget_effect <- rnorm(n_draws, 0, 0.5)
+crew_effect <- rnorm(n_draws, 0, 0.5)
+
+# Representative profiles on standardised scales
+prior_profiles <- data.frame(
+  profile = c(
+    "Original, average scale",
+    "Franchise, average scale",
+    "Original, higher scale"
+  ),
+  franchise = c(0, 1, 0),
+  budget_z = c(0, 0, 1),
+  crew_z = c(0, 0, 1)
+)
+
+# Function to summarise implied probabilities
+check_prior <- function(intercept, prior_name) {
+
+  results <- lapply(
+    seq_len(nrow(prior_profiles)),
+    function(i) {
+
+      log_odds <- intercept +
+        franchise_effect * prior_profiles$franchise[i] +
+        budget_effect * prior_profiles$budget_z[i] +
+        crew_effect * prior_profiles$crew_z[i]
+
+      probabilities <- plogis(log_odds)
+
+      data.frame(
+        prior = prior_name,
+        profile = prior_profiles$profile[i],
+        lower = quantile(probabilities, 0.025),
+        median = median(probabilities),
+        upper = quantile(probabilities, 0.975)
+      )
+    }
+  )
+
+  dplyr::bind_rows(results)
+}
+
+prior_comparison <- dplyr::bind_rows(
+  check_prior(intercept_a, "A: Student-t(3, 0, 2.5)"),
+  check_prior(intercept_b, "B: Normal(-1, 1)")
+)
+
+print(prior_comparison)
+```
+
+```{r}
+#| label: task4-bayesian-final-priors
+#| include: false
+
+# Design matrix for Bayesian logistic regression
+task4_formula <- flop ~ primary_genre + franchise_status +
+  budget_z + crew_z
+
+task4_X <- model.matrix(
+  task4_formula,
+  data = task4_bayesian_data
+)
+
+task4_y <- task4_bayesian_data$flop
+
+# Prior standard deviations for regression coefficients
+task4_prior_sd <- rep(1.5, ncol(task4_X))
+names(task4_prior_sd) <- colnames(task4_X)
+
+task4_prior_sd["(Intercept)"] <- 1
+task4_prior_sd["budget_z"] <- 0.5
+task4_prior_sd["crew_z"] <- 0.5
+
+# Prior means
+task4_prior_mean <- rep(0, ncol(task4_X))
+names(task4_prior_mean) <- colnames(task4_X)
+
+task4_prior_mean["(Intercept)"] <- -1
+
+# Log-posterior = log-likelihood + log-prior
+task4_log_posterior <- function(beta) {
+
+  eta <- drop(task4_X %*% beta)
+
+  # Numerically stable Bernoulli log-likelihood
+  log_likelihood <- sum(
+    task4_y * eta -
+      (pmax(eta, 0) + log1p(exp(-abs(eta))))
+  )
+
+  log_prior <- sum(
+    dnorm(
+      beta,
+      mean = task4_prior_mean,
+      sd = task4_prior_sd,
+      log = TRUE
+    )
+  )
+
+  log_likelihood + log_prior
+}
+```
+
+```{r}
+#| label: task4-bayesian-prior-predictive
+#| include: false
+#| eval: false
+
+task4_prior_fit <- brms::brm(
+  flop ~ primary_genre + franchise_status +
+    budget_z + crew_z,
+  data = task4_bayesian_data,
+  family = brms::bernoulli(),
+  prior = task4_bayesian_priors,
+  sample_prior = "only",
+  backend = "cmdstanr",
+  chains = 2,
+  iter = 1000,
+  warmup = 500,
+  cores = 2,
+  seed = 2420,
+  file = "task4_prior_predictive_fit"
+)
+
+# Prior-predictive probabilities for all modelled films
+prior_probabilities <- brms::posterior_epred(
+  task4_prior_fit
+)
+
+# Distribution of the average implied flop probability
+prior_average_risk <- rowMeans(prior_probabilities)
+
+quantile(
+  prior_average_risk,
+  c(0.025, 0.5, 0.975)
+)
+
+# Simulated number of flops in the modelling sample
+prior_simulated_outcomes <- brms::posterior_predict(
+  task4_prior_fit
+)
+
+prior_flop_counts <- rowSums(prior_simulated_outcomes)
+
+quantile(
+  prior_flop_counts,
+  c(0.025, 0.5, 0.975)
+)
+```
+
+```{r}
+#| label: task4-bayesian-fit
+#| include: false
+
+# Locate a suitable starting point for Metropolis sampling
+task4_mode <- optim(
+  par = task4_prior_mean,
+  fn = function(beta) -task4_log_posterior(beta),
+  method = "BFGS",
+  hessian = TRUE,
+  control = list(maxit = 2000)
+)
+
+print(task4_mode$convergence)
+
+# Estimate the proposal covariance
+task4_proposal_cov <- solve(task4_mode$hessian)
+
+# Run four Metropolis-Hastings chains
+set.seed(2420)
+
+task4_mh_chains <- lapply(1:4, function(chain) {
+
+  starting_values <- as.numeric(
+    MASS::mvrnorm(
+      1,
+      mu = task4_mode$par,
+      Sigma = task4_proposal_cov
+    )
+  )
+
+  chain_result <- MCMCpack::MCMCmetrop1R(
+    fun = task4_log_posterior,
+    theta.init = starting_values,
+    V = task4_proposal_cov,
+    tune = 0.4,
+    burnin = 4000,
+    mcmc = 12000,
+    thin = 1,
+    logfun = TRUE,
+    verbose = 0
+  )
+
+  colnames(chain_result) <- colnames(task4_X)
+
+  chain_result
+})
+
+task4_mh_chains <- do.call(
+  coda::mcmc.list,
+  task4_mh_chains
+)
+saveRDS(task4_mh_chains, "task4_mh_fit.rds")
+
+# Combine the four chains into a matrix of posterior draws
+task4_mh_draws <- as.matrix(task4_mh_chains)
+```
+
+```{r}
+#| label: task4-bayesian-diagnostics
+#| include: false
+
+# Check agreement between the four chains
+task4_rhat <- coda::gelman.diag(
+  task4_mh_chains,
+  multivariate = FALSE
+)
+
+# Check effective sample sizes
+task4_ess <- coda::effectiveSize(task4_mh_chains)
+
+print(task4_rhat)
+cat("Minimum ESS:", round(min(task4_ess), 1), "\n")
+cat(
+  "Maximum upper R-hat:",
+  round(max(task4_rhat$psrf[, 2]), 3),
+  "\n"
+)
+```
+
+```{r}
+#| label: tbl-task4-bayesian-results
+#| echo: false
+#| tbl-cap: "Selected Bayesian logistic regression estimates with 95% credible intervals."
+
+task4_bayesian_results <- data.frame(
+  Predictor = c(
+    "Franchise (vs original)",
+    "Budget (+$10 million)",
+    "Crew (+10 members)"
+  ),
+  Median_OR = c(
+    median(exp(task4_mh_draws[, "franchise_statusFranchise"])),
+    median(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd)),
+    median(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd))
+  ),
+  Lower = c(
+    quantile(exp(task4_mh_draws[, "franchise_statusFranchise"]), 0.025),
+    quantile(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd), 0.025),
+    quantile(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd), 0.025)
+  ),
+  Upper = c(
+    quantile(exp(task4_mh_draws[, "franchise_statusFranchise"]), 0.975),
+    quantile(exp(task4_mh_draws[, "budget_z"] / task4_budget_sd), 0.975),
+    quantile(exp(task4_mh_draws[, "crew_z"] / task4_crew_sd), 0.975)
+  )
+)
+
+task4_bayesian_results |>
+  dplyr::mutate(
+    `Median odds ratio (95% CrI)` = sprintf(
+      "%.3f (%.3f–%.3f)", Median_OR, Lower, Upper
+    )
+  ) |>
+  dplyr::select(Predictor, `Median odds ratio (95% CrI)`) |>
+  knitr::kable(row.names = FALSE)
+```
+
+**Bayesian findings and limitations**
+
+The Bayesian logistic regression was estimated using four Metropolis–Hastings chains. The acceptance rates were approximately 35.5%–36.6%, with a minimum effective sample size of 522.1 and a maximum upper R-hat of 1.012. These diagnostics suggest that the chains mixed reasonably well and produced sufficiently consistent estimates for the main analysis.
+
+The Bayesian results were broadly consistent with the frequentist model. Franchise films had lower estimated flop odds than original films, while higher budgets and larger crews were also associated with lower flop odds. These are associations rather than evidence of causation.
+
+The Foreign genre requires particular caution. Only one film in this category had a known outcome, making its estimated effect highly uncertain. Its posterior median coefficient was 0.939, with a 95% credible interval from −1.186 to 3.413 on the log-odds scale. Since this interval includes zero, there is insufficient evidence to determine whether this genre has higher or lower flop odds than the reference genre. The Bayesian prior helped stabilise the estimate, but it cannot compensate for the lack of observations.
+
+## Model Comparison
+
+```{r}
+#| label: task4-model-comparison-data
+#| include: false
+
+# Frequentist estimates
+frequentist_coefs <- coef(task4_frequentist)
+frequentist_ci <- confint.default(task4_frequentist)
+
+predictors <- c(
+  "franchise_statusFranchise",
+  "budget_10m",
+  "crew_10"
+)
+
+
+# Convert Bayesian coefficients to comparable odds ratios
+bayesian_or_draws <- cbind(
+  Franchise = exp(
+    task4_mh_draws[, "franchise_statusFranchise"]
+  ),
+  Budget = exp(
+    task4_mh_draws[, "budget_z"] / task4_budget_sd
+  ),
+  Crew = exp(
+    task4_mh_draws[, "crew_z"] / task4_crew_sd
+  )
+)
+
+# Summarise posterior odds ratios
+bayesian_medians <- apply(bayesian_or_draws, 2, median)
+bayesian_lower <- apply(bayesian_or_draws, 2, quantile, 0.025)
+bayesian_upper <- apply(bayesian_or_draws, 2, quantile, 0.975)
+
+comparison <- data.frame(
+  Predictor = c("Franchise", "Budget (+$10m)", "Crew (+10)"),
+  Frequentist_OR = exp(frequentist_coefs[predictors]),
+  Frequentist_Lower = exp(frequentist_ci[predictors, 1]),
+  Frequentist_Upper = exp(frequentist_ci[predictors, 2]),
+  Bayesian_OR = as.numeric(bayesian_medians),
+  Bayesian_Lower = as.numeric(bayesian_lower),
+  Bayesian_Upper = as.numeric(bayesian_upper)
+)
+
+print(comparison)
+```
+
+```{r}
+#| label: tbl-task4-model-comparison
+#| echo: false
+#| tbl-cap: "Frequentist and Bayesian odds ratios with 95% uncertainty intervals."
+
+comparison_display <- data.frame(
+  Predictor = comparison$Predictor,
+  Frequentist = sprintf(
+    "%.3f (%.3f–%.3f)",
+    comparison$Frequentist_OR,
+    comparison$Frequentist_Lower,
+    comparison$Frequentist_Upper
+  ),
+  Bayesian = sprintf(
+    "%.3f (%.3f–%.3f)",
+    comparison$Bayesian_OR,
+    comparison$Bayesian_Lower,
+    comparison$Bayesian_Upper
+  )
+)
+
+knitr::kable(
+  comparison_display,
+  col.names = c(
+    "Predictor",
+    "Frequentist OR (95% CI)",
+    "Bayesian OR (95% CrI)"
+  ),
+  row.names = FALSE
+)
+```
+
+```{r}
+#| label: task4-posterior-probability
+#| include: false
+
+# Posterior probability that franchise status reduces flop odds
+franchise_draws <- task4_mh_draws[, "franchise_statusFranchise"]
+
+prob_franchise_negative <- mean(franchise_draws < 0)
+
+print(prob_franchise_negative)
+```
+
+The frequentist and Bayesian logistic regression models produced closely aligned results. Franchise films had lower estimated odds of flopping than original films, with a frequentist odds ratio of 0.224 (95% CI: 0.126–0.399) and a Bayesian odds ratio of 0.238 (95% CrI: 0.132–0.390). Budget and crew size also showed similar negative associations with flop odds across both models.
+
+Although the intervals are numerically similar, their interpretations differ. A frequentist 95% confidence interval describes the long-run coverage of the estimation method, whereas a Bayesian 95% credible interval describes uncertainty about the parameter given the data, model and priors.
+
+All retained Metropolis–Hastings samples for the franchise coefficient were negative, giving an estimated posterior probability above 99.9% that franchise status is associated with lower flop odds after accounting for genre, budget and crew size. However, neither approach establishes a causal relationship.
+
+## Classification Performance
+
+```{r}
+#| label: task4-classification-predictions
+#| include: false
+
+# Predict flop probabilities using the frequentist model
+task4_predicted_prob <- predict(
+  task4_frequentist,
+  newdata = task4_model_data,
+  type = "response"
+)
+
+# Classify films using a 50% probability threshold
+task4_predicted_class <- ifelse(
+  task4_predicted_prob >= 0.5,
+  1L,
+  0L
+)
+
+# Compare predicted and actual outcomes
+task4_confusion <- table(
+  Actual = factor(task4_model_data$flop, levels = c(0, 1)),
+  Predicted = factor(task4_predicted_class, levels = c(0, 1))
+)
+
+print(task4_confusion)
+```
+
+```{r}
+#| label: task4-classification-metrics
+#| include: false
+
+# Extract the four confusion matrix counts
+task4_tn <- task4_confusion["0", "0"]
+task4_fp <- task4_confusion["0", "1"]
+task4_fn <- task4_confusion["1", "0"]
+task4_tp <- task4_confusion["1", "1"]
+
+# Calculate classification performance
+task4_accuracy <- (task4_tp + task4_tn) / sum(task4_confusion)
+
+task4_sensitivity <- task4_tp / (task4_tp + task4_fn)
+
+task4_specificity <- task4_tn / (task4_tn + task4_fp)
+
+task4_precision <- if (
+  task4_tp + task4_fp > 0
+) {
+  task4_tp / (task4_tp + task4_fp)
+} else {
+  NA_real_
+}
+
+# Summarise performance
+task4_metrics <- data.frame(
+  Metric = c(
+    "Accuracy",
+    "Sensitivity (flops)",
+    "Specificity (non-flops)",
+    "Precision (predicted flops)"
+  ),
+  Value = c(
+    task4_accuracy,
+    task4_sensitivity,
+    task4_specificity,
+    task4_precision
+  )
+)
+
+print(task4_metrics)
+```
+
+```{r}
+#| label: task4-threshold-comparison
+#| include: false
+
+# Compare classification results at two probability thresholds
+task4_threshold_metrics <- function(threshold) {
+
+  predicted <- ifelse(task4_predicted_prob >= threshold, 1L, 0L)
+
+  actual <- task4_model_data$flop
+
+  tp <- sum(predicted == 1 & actual == 1)
+  tn <- sum(predicted == 0 & actual == 0)
+  fp <- sum(predicted == 1 & actual == 0)
+  fn <- sum(predicted == 0 & actual == 1)
+
+  data.frame(
+    Threshold = threshold,
+    Accuracy = (tp + tn) / length(actual),
+    Sensitivity = tp / (tp + fn),
+    Specificity = tn / (tn + fp),
+    Precision = tp / (tp + fp),
+    Flops_Detected = tp,
+    Flops_Missed = fn
+  )
+}
+
+task4_threshold_results <- dplyr::bind_rows(
+  task4_threshold_metrics(0.50),
+  task4_threshold_metrics(0.30)
+)
+
+print(task4_threshold_results)
+```
+
+```{r}
+#| label: tbl-task4-classification-performance
+#| echo: false
+#| tbl-cap: "In-sample classification performance at two probability thresholds."
+
+task4_performance_display <- task4_threshold_results |>
+  dplyr::mutate(
+    Threshold = paste0(round(Threshold * 100), "%"),
+    dplyr::across(
+      c(Accuracy, Sensitivity, Specificity, Precision),
+      ~ sprintf("%.1f%%", .x * 100)
+    )
+  )
+
+knitr::kable(
+  task4_performance_display,
+  col.names = c(
+    "Threshold",
+    "Accuracy",
+    "Sensitivity",
+    "Specificity",
+    "Precision",
+    "Flops detected",
+    "Flops missed"
+  ),
+  row.names = FALSE
+)
+```
+
+```{r}
+#| label: tbl-task4-confusion-matrix
+#| echo: false
+#| tbl-cap: "In-sample confusion matrix at the 30% threshold."
+
+task4_confusion_display <- table(
+  Actual = factor(
+    task4_model_data$flop,
+    levels = c(0, 1),
+    labels = c("Non-flop", "Flop")
+  ),
+  Predicted = factor(
+    ifelse(task4_predicted_prob >= 0.30, 1, 0),
+    levels = c(0, 1),
+    labels = c("Non-flop", "Flop")
+  )
+)
+
+knitr::kable(
+  as.data.frame.matrix(task4_confusion_display),
+  col.names = c("Predicted non-flop", "Predicted flop")
+)
+```
+
+**Classification performance**
+
+At the standard 50% threshold, the model achieved 75.6% accuracy but identified only 5 of the 784 actual flops, giving a sensitivity of just 0.6%. Since flops represented approximately 24.4% of the modelling sample, predicting most films as non-flops produced a misleadingly high accuracy.
+
+A 30% threshold was therefore considered more suitable for identifying financial risk. It increased sensitivity to 43.1%, correctly identifying 338 flops, although specificity decreased to 74.2% and precision was 35.0%. Overall accuracy fell to 66.6%.
+
+For Meridian, identifying potentially unsuccessful productions before approval may be more valuable than maximising accuracy alone. However, the lower threshold also incorrectly flagged 627 non-flops, meaning these predictions should support further review rather than automatic rejection. The 30% threshold is a practical illustration of this trade-off, not a statistically proven optimum.
+
+These results are based on the films used to fit the model and may overstate performance on future productions.
+
+## Hypothetical Film Pitches
+
+```{r}
+#| label: task4-hypothetical-pitches
+#| include: false
+
+task4_pitches <- data.frame(
+  Pitch = c(
+    "Platform Zero",
+    "The Meridian Protocol: Black Tide",
+    "The Things We Never Recorded"
+  ),
+  primary_genre = c("Horror", "Action", "Drama"),
+  franchise_status = c("Original", "Franchise", "Original"),
+  budget_10m = c(0.9, 8.5, 1.8),
+  crew_10 = c(2.4, 9, 3.8)
+)
+
+# Keep the same categories as the fitted model
+task4_pitches$primary_genre <- factor(
+  task4_pitches$primary_genre,
+  levels = sort(unique(task4_model_data$primary_genre))
+)
+
+task4_pitches$franchise_status <- factor(
+  task4_pitches$franchise_status,
+  levels = levels(task4_model_data$franchise_status)
+)
+
+# Apply the standardisation used in the Bayesian model
+task4_pitches <- task4_pitches |>
+  dplyr::mutate(
+    budget_z = (budget_10m - task4_budget_mean) / task4_budget_sd,
+    crew_z = (crew_10 - task4_crew_mean) / task4_crew_sd
+  )
+
+print(task4_pitches)
+```
+
+```{r}
+#| label: task4-pitch-predictions
+#| include: false
+
+# Build the predictor matrix using the fitted model's columns
+task4_pitch_X <- model.matrix(
+  ~ primary_genre + franchise_status + budget_z + crew_z,
+  data = task4_pitches
+)
+
+# Ensure the columns match the Bayesian model
+task4_pitch_X <- task4_pitch_X[, colnames(task4_mh_draws), drop = FALSE]
+
+# Predicted flop probability for every posterior draw and pitch
+task4_pitch_prob_draws <- plogis(
+  task4_mh_draws %*% t(task4_pitch_X)
+)
+
+# Summarise the posterior probabilities
+task4_pitch_results <- data.frame(
+  Pitch = task4_pitches$Pitch,
+  Median_Probability = apply(task4_pitch_prob_draws, 2, median),
+  Lower_95 = apply(task4_pitch_prob_draws, 2, quantile, probs = 0.025),
+  Upper_95 = apply(task4_pitch_prob_draws, 2, quantile, probs = 0.975)
+)
+
+print(task4_pitch_results)
+```
+
+```{r}
+#| label: tbl-task4-pitch-predictions
+#| echo: false
+#| tbl-cap: "Bayesian predicted flop probabilities and 95% credible intervals for three hypothetical pitches."
+
+task4_pitch_display <- task4_pitch_results |>
+  dplyr::mutate(
+    `Flop probability` = sprintf("%.1f%%", Median_Probability * 100),
+    `95% credible interval` = sprintf(
+      "%.1f%%–%.1f%%",
+      Lower_95 * 100,
+      Upper_95 * 100
+    )
+  ) |>
+  dplyr::select(
+    Pitch,
+    `Flop probability`,
+    `95% credible interval`
+  )
+
+knitr::kable(task4_pitch_display, row.names = FALSE)
+```
+
+### Greenlight recommendations
+
+**The Meridian Protocol: Black Tide — Conditional greenlight**
+
+This franchise action film has the lowest predicted flop probability at 4.7% (95% credible interval: 2.7%–7.9%). Although the estimated risk is relatively low, the proposed $85 million budget represents a substantial financial commitment. Meridian could move the project forward, provided the production budget and expected revenue are reviewed before final approval.
+
+**Platform Zero — Conditional greenlight**
+
+With a predicted flop probability of 16.0% (95% credible interval: 11.2%–22.2%), this original horror film presents a moderate level of risk compared with the other two pitches. Its $9 million budget makes it a smaller financial commitment. A conditional greenlight would allow Meridian to explore the project further while checking whether its expected audience and distribution plans support the investment.
+
+**The Things We Never Recorded — Hold for further review**
+
+This original drama has the highest predicted flop probability at 28.8% (95% credible interval: 25.6%–32.6%). Given its proposed $18 million budget, approving the project without further financial assessment would be difficult to justify. Meridian could review the budget, intended audience and distribution strategy before reconsidering the proposal.
+
+These recommendations are based on estimated flop risk rather than guaranteed outcomes. A lower predicted probability does not necessarily mean a project offers a better financial return.
+
+## Summary for the Head of Production
+
+The greenlight model provides Meridian with an early assessment of a film's financial risk using information available before production begins. By considering genre, franchise status, budget and crew size, it estimates the likelihood of a film failing to recover its production budget.
+
+Among the three proposed films, *The Meridian Protocol: Black Tide* has the lowest estimated flop risk, followed by *Platform Zero*. *The Things We Never Recorded* presents the greatest concern and would benefit from further review before approval.
+
+However, the model has important limitations. Its predictions rely on historical films with sufficient financial information and do not capture factors such as audience demand, marketing, release timing or distribution arrangements. The model also estimates the chance of a flop, not the amount of money a studio might lose. Its classification results were assessed using the same films on which it was trained, so performance on future productions remains uncertain.
+
+Meridian should therefore use these estimates as an early warning tool rather than a final decision-maker. Combining the model's findings with financial forecasts and professional judgement would provide a more balanced basis for greenlight decisions.
+
 
 # Appendix: Group Collaboration
 
@@ -59,7 +2027,3 @@ execute:
 ## Cross-Review
 
 [Record reviewers and feedback for each task.]
-
-## Reproducibility
-
-[Document how the final report was checked.]

@@ -1,17 +1,21 @@
 ---
 title: "Task 4: Building a Greenlight Risk Model"
 format:
-  html:
+  pdf:
+<<<<<<< HEAD
     toc: true
+=======
+    toc: false
+>>>>>>> b5ae31d33d89041fb685718e5d07f90d40065b75
     number-sections: true
+    fontsize: 10pt
 execute:
   warning: false
   message: false
+  echo: false
 ---
 
 # Task 4: Building a Greenlight Risk Model
-
-## Data Preparation
 
 ```{r}
 #| label: task1-setup
@@ -20,7 +24,7 @@ execute:
 library(tidyverse)
 library(knitr)
 
-theme_set(theme_minimal(base_size = 11))
+theme_set(theme_minimal(base_size = 9))
 
 focus_genres <- c(
   "Action", "Comedy", "Drama",
@@ -57,7 +61,7 @@ movies_focus <- movies_clean |>
 
 ## Introduction
 
-This analysis examines whether information available before production can help Meridian identify films at risk of failing to recover their budgets. Frequentist and Bayesian logistic regression models were fitted using genre, franchise status, budget and crew size. The results are used to assess classification performance and estimate financial risk for three hypothetical film proposals.
+This analysis examines whether information available before production can help Meridian assess the risk of a film failing to recover its budget. We fitted *Frequentist and Bayesian logistic regression models* using genre, franchise status, production budget and crew size. The aim was to identify useful patterns in historical films and assess how these estimates might support greenlight decisions.
 
 ## Outcome and Predictor Definitions
 
@@ -109,13 +113,11 @@ task4_data |>
   )
 ```
 
-Financial risk was assessed using return on investment (ROI), calculated as box-office revenue divided by production budget. A film was classified as a *flop* when its ROI was below 1, indicating that reported revenue did not recover the production budget. Films with an ROI of 1 or higher were classified as *non-flops*, while those with missing ROI were left unclassified.
+A film was classified as a flop when its reported box-office revenue was lower than its production budget *(ROI < 1)*. Films with missing financial information were left unclassified rather than assumed to be successful or unsuccessful.
 
-Of the 4,801 films examined, 785 were identified as flops and 2,429 as non-flops, with the remaining 1,587 lacking sufficient financial information for classification. Among the 3,214 films with known outcomes, the observed flop rate was approximately 24.4%.
+Of the 4,801 films examined, 3,214 had a known outcome, including 785 flops *(24.4%)*. After excluding observations with missing predictor information, *3,213 films remained for modelling*.
 
-Logistic regression was selected because the outcome is binary, allowing the model to estimate the probability of a film flopping while keeping predicted values between 0 and 1. Linear regression is less appropriate because its predictions are not restricted to this range, whereas Poisson regression is primarily designed for count outcomes rather than binary classifications.
-
-The proposed predictors were primary genre, franchise status, production budget and crew size, as these characteristics can reasonably be considered before a film receives production approval. After accounting for missing outcome and predictor information, 3,213 films had complete observations available for modelling. However, the substantial amount of missing financial data remains an important limitation, as films with recorded outcomes may not be representative of the wider dataset, potentially introducing selection bias.
+Logistic regression was chosen because the outcome is binary and the model estimates probabilities between zero and one. Genre, franchise status, budget and crew size were selected because these characteristics can be considered before production approval. Budget and crew size were expressed in units of $10 million and 10 people to make the results easier to interpret. Missing financial information may introduce *selection bias* if the films retained for modelling differ systematically from those excluded.
 
 ## Frequentist Logistic Regression
 
@@ -209,7 +211,7 @@ task4_odds_table |>
 
 ```{r}
 #| label: task4-frequentist-results
-#| echo: false
+#| include: false
 
 task4_odds_table |>
   dplyr::filter(
@@ -241,13 +243,9 @@ task4_odds_table |>
     caption = "Selected frequentist logistic regression results"
   )
 ```
-**Interpretation**
+After adjusting for the other predictors, franchise films had substantially lower odds of flopping than original films *(OR = 0.224, 95% CI: 0.126–0.399)*. Each additional $10 million in budget was associated with *4.0% lower odds (OR = 0.960)*, while an additional 10 crew members was associated with *9.4% lower odds (OR = 0.906)*.
 
-The frequentist logistic regression was fitted using 3,213 films with complete information. After accounting for genre, budget and crew size, franchise films had approximately 77.6% lower odds of flopping than original films (OR = 0.224, 95% CI: 0.126–0.399). A further $10 million in budget was associated with 4.0% lower odds of flopping (OR = 0.960, 95% CI: 0.936–0.985), while an additional 10 crew members was associated with 9.4% lower odds (OR = 0.906, 95% CI: 0.877–0.936). These findings suggest that franchise status, budget and crew size are associated with financial outcomes, although they do not establish causal relationships.
-
-**Limitations**
-
-The model has two important limitations. First, the Foreign genre contained only one film with a known outcome, which was a flop. This resulted in complete separation and an unstable coefficient, making its estimated odds ratio unreliable. Second, the analysis used 3,213 of the original 4,801 films because observations with missing information were excluded. If missing financial data are not random, the estimated relationships may not represent all films. These limitations should be considered when interpreting the results and comparing them with the Bayesian model.
+These relationships are associations, *not evidence* that larger budgets or crews directly reduce financial risk. The Foreign genre also contained only one film with a known outcome, leading to an unstable frequentist estimate.
 
 ## Bayesian Logistic Regression
 
@@ -455,53 +453,6 @@ task4_log_posterior <- function(beta) {
 ```
 
 ```{r}
-#| label: task4-bayesian-prior-predictive
-#| include: false
-#| eval: false
-
-task4_prior_fit <- brms::brm(
-  flop ~ primary_genre + franchise_status +
-    budget_z + crew_z,
-  data = task4_bayesian_data,
-  family = brms::bernoulli(),
-  prior = task4_bayesian_priors,
-  sample_prior = "only",
-  backend = "cmdstanr",
-  chains = 2,
-  iter = 1000,
-  warmup = 500,
-  cores = 2,
-  seed = 2420,
-  file = "task4_prior_predictive_fit"
-)
-
-# Prior-predictive probabilities for all modelled films
-prior_probabilities <- brms::posterior_epred(
-  task4_prior_fit
-)
-
-# Distribution of the average implied flop probability
-prior_average_risk <- rowMeans(prior_probabilities)
-
-quantile(
-  prior_average_risk,
-  c(0.025, 0.5, 0.975)
-)
-
-# Simulated number of flops in the modelling sample
-prior_simulated_outcomes <- brms::posterior_predict(
-  task4_prior_fit
-)
-
-prior_flop_counts <- rowSums(prior_simulated_outcomes)
-
-quantile(
-  prior_flop_counts,
-  c(0.025, 0.5, 0.975)
-)
-```
-
-```{r}
 #| label: task4-bayesian-fit
 #| include: false
 
@@ -583,7 +534,7 @@ cat(
 
 ```{r}
 #| label: tbl-task4-bayesian-results
-#| echo: false
+#| include: false
 #| tbl-cap: "Selected Bayesian logistic regression estimates with 95% credible intervals."
 
 task4_bayesian_results <- data.frame(
@@ -620,12 +571,9 @@ task4_bayesian_results |>
 ```
 
 **Bayesian findings and limitations**
+The Bayesian model used the same predictors, with budget and crew size standardised before estimation. We compared candidate priors and selected a *Normal(−1, 1)* intercept prior, Normal(0, 1.5) priors for genre and franchise coefficients, and Normal(0, 0.5) priors for standardised budget and crew coefficients. These choices provided some regularisation while allowing uncertainty in the effects.
 
-The Bayesian logistic regression was estimated using four Metropolis–Hastings chains. The acceptance rates were approximately 35.5%–36.6%, with a minimum effective sample size of 522.1 and a maximum upper R-hat of 1.012. These diagnostics suggest that the chains mixed reasonably well and produced sufficiently consistent estimates for the main analysis.
-
-The Bayesian results were broadly consistent with the frequentist model. Franchise films had lower estimated flop odds than original films, while higher budgets and larger crews were also associated with lower flop odds. These are associations rather than evidence of causation.
-
-The Foreign genre requires particular caution. Only one film in this category had a known outcome, making its estimated effect highly uncertain. Its posterior median coefficient was 0.939, with a 95% credible interval from −1.186 to 3.413 on the log-odds scale. Since this interval includes zero, there is insufficient evidence to determine whether this genre has higher or lower flop odds than the reference genre. The Bayesian prior helped stabilise the estimate, but it cannot compensate for the lack of observations.
+We estimated the posterior using four *Metropolis–Hastings chains*, with 4,000 burn-in iterations and 12,000 retained draws per chain. A proposal *tuning factor of 0.4* was used to control the size of proposed moves. Acceptance rates were approximately *35.5%–36.6%*, the minimum effective sample size was 522, and the maximum upper *R-hat was 1.012*. These checks suggest reasonable sampling stability, although they cannot rule out model misspecification.
 
 ## Model Comparison
 
@@ -719,11 +667,11 @@ prob_franchise_negative <- mean(franchise_draws < 0)
 print(prob_franchise_negative)
 ```
 
-The frequentist and Bayesian logistic regression models produced closely aligned results. Franchise films had lower estimated odds of flopping than original films, with a frequentist odds ratio of 0.224 (95% CI: 0.126–0.399) and a Bayesian odds ratio of 0.238 (95% CrI: 0.132–0.390). Budget and crew size also showed similar negative associations with flop odds across both models.
+The frequentist and Bayesian logistic regression models both approaches gave *similar results*. For franchise status, the frequentist odds ratio was 0.224 (95% CI: 0.126–0.399), compared with a Bayesian posterior median odds ratio of *0.238 (95% credible interval: 0.132–0.390)*. Budget and crew size also showed similar associations across the two models.
 
-Although the intervals are numerically similar, their interpretations differ. A frequentist 95% confidence interval describes the long-run coverage of the estimation method, whereas a Bayesian 95% credible interval describes uncertainty about the parameter given the data, model and priors.
+The intervals have different interpretations: frequentist confidence intervals describe the long-run coverage of the estimation procedure, whereas Bayesian credible intervals describe uncertainty about the coefficients given the data and priors.*More than 99.9%* of retained posterior draws indicated lower flop odds for franchise films, after accounting for the other predictors.
 
-All retained Metropolis–Hastings samples for the franchise coefficient were negative, giving an estimated posterior probability above 99.9% that franchise status is associated with lower flop odds after accounting for genre, budget and crew size. However, neither approach establishes a causal relationship.
+The Bayesian prior reduced instability in sparse categories, but the *Foreign genre remained too poorly represented* for a reliable conclusion. 
 
 ## Classification Performance
 
@@ -888,13 +836,11 @@ knitr::kable(
 
 **Classification performance**
 
-At the standard 50% threshold, the model achieved 75.6% accuracy but identified only 5 of the 784 actual flops, giving a sensitivity of just 0.6%. Since flops represented approximately 24.4% of the modelling sample, predicting most films as non-flops produced a misleadingly high accuracy.
+At the standard 50% threshold, the frequentist model achieved *75.6% accuracy but* identified only 5 of the 784 actual flops *(sensitivity 0.6%)*. This illustrates why accuracy alone can be misleading when non-flops are more common.
 
-A 30% threshold was therefore considered more suitable for identifying financial risk. It increased sensitivity to 43.1%, correctly identifying 338 flops, although specificity decreased to 74.2% and precision was 35.0%. Overall accuracy fell to 66.6%.
+Lowering the threshold to 30% increased sensitivity to *43.1%*, identifying 338 flops. However, specificity fell to 74.2%, precision was 35.0%, and *627 non-flops* were *incorrectly flagged*. Overall accuracy decreased to 66.6%.
 
-For Meridian, identifying potentially unsuccessful productions before approval may be more valuable than maximising accuracy alone. However, the lower threshold also incorrectly flagged 627 non-flops, meaning these predictions should support further review rather than automatic rejection. The 30% threshold is a practical illustration of this trade-off, not a statistically proven optimum.
-
-These results are based on the films used to fit the model and may overstate performance on future productions.
+For Meridian, a lower threshold may be more useful for screening projects when missing a potential flop is costly. However, it also increases unnecessary reviews, and 30% should not be treated as an optimal threshold. These figures were calculated on the *training sample*, so performance on new films remains uncertain.
 
 ## Hypothetical Film Pitches
 
@@ -987,28 +933,23 @@ task4_pitch_display <- task4_pitch_results |>
 knitr::kable(task4_pitch_display, row.names = FALSE)
 ```
 
-### Greenlight recommendations
+### Hypothetical Film Pitches and Greenlight recommendations
 
-**The Meridian Protocol: Black Tide — Conditional greenlight**
+Three fictional pitches were assessed using the Bayesian model. Their estimated flop probabilities and 95% credible intervals reflect uncertainty in the model's predictions.
 
-This franchise action film has the lowest predicted flop probability at 4.7% (95% credible interval: 2.7%–7.9%). Although the estimated risk is relatively low, the proposed $85 million budget represents a substantial financial commitment. Meridian could move the project forward, provided the production budget and expected revenue are reviewed before final approval.
+*The Meridian Protocol: Black Tide* — *Conditional greenlight*. This $85 million franchise action film had the lowest predicted flop probability at 4.7% (95% CrI: 2.7%–7.9%). Its relatively low estimated risk supports further consideration, but the large budget makes a separate revenue and potential-loss assessment important before approval.
 
-**Platform Zero — Conditional greenlight**
+*Platform Zero* — Conditional greenlight. This $9 million original horror film had a predicted flop probability of 16.0% (95% CrI: 11.2%–22.2%). Its smaller budget limits the initial financial commitment. Approval should depend on whether the expected audience and distribution arrangements support the investment.
 
-With a predicted flop probability of 16.0% (95% credible interval: 11.2%–22.2%), this original horror film presents a moderate level of risk compared with the other two pitches. Its $9 million budget makes it a smaller financial commitment. A conditional greenlight would allow Meridian to explore the project further while checking whether its expected audience and distribution plans support the investment.
+*The Things We Never Recorded* — *Hold for review*. This $18 million original drama had the highest estimated flop probability at 28.8% (95% CrI: 25.6%–32.6%). The project would benefit from reviewing its budget and expected revenue before Meridian commits to production.
 
-**The Things We Never Recorded — Hold for further review**
+A lower flop probability does not necessarily imply a higher expected financial return, since the model does not estimate the size of potential profits or losses.
 
-This original drama has the highest predicted flop probability at 28.8% (95% credible interval: 25.6%–32.6%). Given its proposed $18 million budget, approving the project without further financial assessment would be difficult to justify. Meridian could review the budget, intended audience and distribution strategy before reconsidering the proposal.
-
-These recommendations are based on estimated flop risk rather than guaranteed outcomes. A lower predicted probability does not necessarily mean a project offers a better financial return.
 
 ## Summary for the Head of Production
 
-The greenlight model provides Meridian with an early assessment of a film's financial risk using information available before production begins. By considering genre, franchise status, budget and crew size, it estimates the likelihood of a film failing to recover its production budget.
+The models provide Meridian with an initial way to compare financial risk across film proposals using information available before production. Franchise status, budget and crew size were associated with flop outcomes in the historical data, but the *results should not be interpreted as causal*.
 
-Among the three proposed films, *The Meridian Protocol: Black Tide* has the lowest estimated flop risk, followed by *Platform Zero*. *The Things We Never Recorded* presents the greatest concern and would benefit from further review before approval.
+The main limitations are missing financial records, limited observations for some genres and the absence of important commercial factors such as marketing, audience demand and distribution. The classification results were also assessed on the same data used to fit the model, so *performance on future productions is not established*.
 
-However, the model has important limitations. Its predictions rely on historical films with sufficient financial information and do not capture factors such as audience demand, marketing, release timing or distribution arrangements. The model also estimates the chance of a flop, not the amount of money a studio might lose. Its classification results were assessed using the same films on which it was trained, so performance on future productions remains uncertain.
-
-Meridian should therefore use these estimates as an early warning tool rather than a final decision-maker. Combining the model's findings with financial forecasts and professional judgement would provide a more balanced basis for greenlight decisions.
+Meridian should therefore use these predictions to identify projects requiring closer financial review, alongside revenue forecasts and professional judgement, *rather than as automatic greenlight decision*s.
