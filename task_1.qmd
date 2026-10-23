@@ -14,8 +14,6 @@ execute:
 
 # Task 1: Slate Health Check
 
-## Introduction
-
 ```{r}
 #| label: task1-setup
 #| include: false
@@ -56,13 +54,17 @@ movies_clean <- movies |>
 
 movies_focus <- movies_clean |>
   filter(primary_genre %in% focus_genres)
+
+franchise_summary <- movies_clean |>
+  count(franchise_status, name = "Films") |>
+  mutate(
+    Percentage = round(100 * Films / sum(Films), 1)
+  )
 ```
 
 ## Data Preparation and quality
 
-The data are from the course-provided movie dataset, based on The Movie Database [@tmdb]. Films released after 2016 are excluded. Budgets below $10,000 and zero revenues are treated as missing, and ROI is calculated as revenue divided by budget. For genre comparisons, each film is assigned to its first-listed genre.
-
-The analysis excludes films released after 2016, treats budgets below $10,000 and zero revenue as missing, and recalculates ROI using valid financial observations. Each film is assigned to its first-listed (`primary_genre`) genre to avoid counting the same film multiple times.
+The course-provided dataset is based on The Movie Database [@tmdb]. Films released after 2016 are excluded, while budgets below $10,000 and zero revenues are treated as missing. ROI is recalculated as revenue divided by production budget. For genre comparisons, films are classified using their first-listed genre to prevent double-counting.
 
 ```{r}
 #| label: task1-data-quality
@@ -88,7 +90,10 @@ data_quality <- tibble(
   )
 )
 
-kable(data_quality, caption = "Data quality summary")
+knitr::kable(
+  data_quality,
+  caption = "Data quality summary"
+)
 ```
 
 ```{r}
@@ -129,6 +134,11 @@ knitr::kable(
   financial_summary,
   caption = "Summary statistics for production budgets and ROI"
 )
+
+knitr::kable(
+  franchise_summary,
+  caption = "Franchise and Original film composition"
+)
 ```
 
 Of 4,801 films in the analysis period, 1,070 have an invalid or missing budget, 1,425 have missing revenue and 1,587 have missing ROI. Financial results therefore reflect only films with usable values. The median budget is **$24 million** and median ROI is **2.30**; medians are more informative than means because a few films have unusually large values.
@@ -138,8 +148,8 @@ Of 4,801 films in the analysis period, 1,070 have an invalid or missing budget, 
 ```{r}
 #| label: fig-overall
 #| fig-cap: "Distribution of budgets and ROI, and film composition."
-#| fig-width: 7.3
-#| fig-height: 2.2
+#| fig-width: 8
+#| fig-height: 3
 
 p1 <- ggplot(
   movies_clean |> filter(!is.na(budget_m)),
@@ -180,12 +190,6 @@ p2 <- ggplot(
     y = "Number of films"
   )
 
-franchise_summary <- movies_clean |>
-  count(franchise_status, name = "Films") |>
-  mutate(
-    Percentage = round(100 * Films / sum(Films), 1)
-  )
-
 p3 <- ggplot(
   franchise_summary,
   aes(x = franchise_status,
@@ -208,7 +212,7 @@ p3 <- ggplot(
   guides(fill = "none") +
   expand_limits(y = max(franchise_summary$Films) * 1.1)
 
-(p1 + p2 + p3) + plot_layout(ncol = 3)
+(p1 + p2 + p3)
 ```
 
 Budgets are right-skewed, with most films concentrated at the lower end. ROI is also highly skewed, so it is displayed on a log scale; the dashed line marks revenue equal to budget (ROI = 1). **Original films make up 94.6%** of the dataset, compared with **5.4% franchises**.
@@ -219,7 +223,7 @@ Budgets are right-skewed, with most films concentrated at the lower end. ROI is 
 #| label: fig-genres
 #| fig-cap: "Budgets, ROI and franchise composition across the five focus genres."
 #| fig-width: 7.3
-#| fig-height: 2.4
+#| fig-height: 3
 p4 <- ggplot(
   movies_focus |> filter(!is.na(budget_m)),
   aes(
@@ -298,7 +302,8 @@ Animation and action generally have higher production budgets, while horror and 
 #| label: fig-trends
 #| fig-cap: "Median budgets, median ROI and film composition by release year, 1990–2016."
 #| fig-width: 7.3
-#| fig-height: 2.4
+#| fig-height: 3
+
 budget_trend <- movies_clean |>
   filter(release_year >= 1990) |>
   group_by(release_year) |>
@@ -382,10 +387,11 @@ p9 <- ggplot(
     fill = "Film type"
   )
 
-(p7 + p8 + p9) + plot_layout(ncol = 3)
+(p7 + p8) / p9 +
+  plot_layout(heights = c(1, 0.8))
 ```
 
-Median budgets fluctuate rather than increasing steadily between 1990 and 2016. Median ROI also changes across years but generally remains above 1. Most films remain originals throughout the period, although the franchise share varies from year to year. These patterns are descriptive and do not by themselves explain changes in film profitability.
+Between 1990 and 2016, median production budgets fluctuate without a consistent upward trend. Median ROI also varies considerably across release years but generally remains above one, indicating that reported box-office revenues typically exceed production budgets. Original productions dominate the slate throughout the period, although the proportion of franchises changes between years. These patterns suggest that production costs and returns vary over time, without establishing a consistent shift towards franchises.
 
 ## Summary for the Head of Production
 
@@ -394,4 +400,3 @@ The dataset is dominated by original films, with relatively few franchises. Typi
 Production scale differs across genres: action and animation tend to need larger budgets, while horror and drama often operate at lower levels. ROI remains variable within every genre, so genre or budget alone should not be treated as a reliable predictor of financial success.
 
 Finally, missing financial values are substantial: only **3,214 films** have both a valid budget and ROI. Comparisons should be viewed as exploratory, especially because box-office revenue is not the same as studio profit and ROI here does not deduct marketing or distribution costs.
-
