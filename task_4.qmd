@@ -2,11 +2,8 @@
 title: "Task 4: Building a Greenlight Risk Model"
 format:
   pdf:
-<<<<<<< HEAD
     toc: true
-=======
     toc: false
->>>>>>> b5ae31d33d89041fb685718e5d07f90d40065b75
     number-sections: true
     fontsize: 10pt
 execute:
