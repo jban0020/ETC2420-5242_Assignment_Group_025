@@ -100,7 +100,9 @@ ggplot(
 The boxplots show that Franchise films generally have higher production budgets than Original films, as reflected in their higher median. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in this category. However, the distributions overlap, so some Original films have budgets comparable to those of Franchise films. These visual findings are examined further using a confidence interval for the difference in median budgets.
 
 ```{r}
-#| label: task2-budget-summary
+#| label: tbl-task2-budget-summary
+#| tbl-cap: "Median production budget by film classification."
+#| tbl-pos: "H"
 
 budget_summary <- movies_clean |>
   filter(
@@ -117,9 +119,6 @@ budget_summary <- movies_clean |>
 
 budget_summary |>
   gt::gt() |>
-  gt::tab_header(
-    title = "Median Production Budget by Film Classification"
-  ) |>
   gt::fmt_number(
     columns = median_budget_m,
     decimals = 2
@@ -181,19 +180,23 @@ bootstrap_results <- tibble(
 ```
 
 ```{r}
-#| label: task2-bootstrap-ci
+#| label: task2-bootstrap-ci-calculation
+#| include: false
 
 bootstrap_ci <- bootstrap_results |>
   summarise(
     lower = quantile(boot_diff, probs = 0.025),
     upper = quantile(boot_diff, probs = 0.975)
   )
+```
+
+```{r}
+#| label: tbl-task2-bootstrap-ci
+#| tbl-cap: "95% bootstrap interval for the difference in median production budgets (Franchise minus Original), in USD millions."
+#| tbl-pos: "H"
 
 bootstrap_ci |>
   gt::gt() |>
-  gt::tab_header(
-    title = "95% Bootstrap Interval for Median Budget Difference"
-  ) |>
   gt::fmt_number(
     columns = c(lower, upper),
     decimals = 2
@@ -207,9 +210,9 @@ bootstrap_ci |>
 To estimate the uncertainty in the difference between median production budgets, we used a bootstrap percentile method with 1,000 resamples. In each resample, budgets were sampled with replacement separately for Original and Franchise films, preserving the sample size of each group. The difference between the resampled medians was calculated as Franchise minus Original, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to obtain a 95% interval estimate. The resulting interval was approximately **\$9.00 million to \$25.03 million**, compared with an observed median budget difference of \$18 million. As the interval lies entirely above zero, the results provide evidence that Franchise films have a higher median production budget than Original films.
 
 ```{r}
-#| label: task2-revenue-summary
-#| fig-width: 6
-#| fig-height: 3.5
+#| label: tbl-task2-revenue-summary
+#| tbl-cap: "Reported revenue by film classification."
+#| tbl-pos: "H"
 
 revenue_summary <- movies_clean |>
   filter(
@@ -240,9 +243,6 @@ revenue_summary |>
     revenue_share
   ) |>
   gt::gt() |>
-  gt::tab_header(
-    title = "Revenue by film classification"
-  ) |>
   gt::fmt_number(
     columns = films_with_revenue,
     decimals = 0
