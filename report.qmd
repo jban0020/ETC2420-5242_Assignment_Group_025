@@ -541,13 +541,9 @@ budget_summary |>
 ## Interval Estimation
 
 ```{r}
-<<<<<<< Updated upstream
 #| label: task2-bootstrap-data
 #| include: false
-=======
-#| label: task2-bootstrap
 #| echo: true
->>>>>>> Stashed changes
 
 original_budgets <- movies_clean |>
   filter(franchise_status == "Original", !is.na(budget_m), budget_m > 0) |>
@@ -560,12 +556,9 @@ franchise_budgets <- movies_clean |>
 ```{r}
 #| label: task2-bootstrap-results
 #| include: false
-=======
->>>>>>> Stashed changes
 
 # Resample each group separately, keeping its size; record Franchise minus Original medians
 set.seed(5242)
-<<<<<<< Updated upstream
 
 bootstrap_results <- tibble(
   replicate = 1:1000
@@ -594,7 +587,6 @@ bootstrap_ci <- bootstrap_results |>
     lower = quantile(boot_diff, probs = 0.025),
     upper = quantile(boot_diff, probs = 0.975)
   )
-=======
 bootstrap_results <- tibble(replicate = 1:1000) |>
   mutate(boot_diff = map_dbl(replicate, function(i) {
     original_boot <- sample(x = original_budgets, size = length(original_budgets), replace = TRUE)
@@ -606,7 +598,6 @@ bootstrap_ci <- bootstrap_results |>
   summarise(lower = quantile(boot_diff, probs = 0.025),
             upper = quantile(boot_diff, probs = 0.975))
 bootstrap_ci
->>>>>>> Stashed changes
 ```
 
 ```{r}
@@ -1386,7 +1377,6 @@ print(prior_comparison)
 
 ```{r}
 #| label: task4-bayesian-final-priors
-<<<<<<< Updated upstream
 #| include: false
 
 task4_formula <- flop ~ primary_genre + franchise_status +
@@ -1396,15 +1386,12 @@ task4_X <- model.matrix(
   task4_formula,
   data = task4_bayesian_data
 )
-=======
 #| echo: true
->>>>>>> Stashed changes
-
 task4_formula <- flop ~ primary_genre + franchise_status + budget_z + crew_z
 task4_X <- model.matrix(task4_formula, data = task4_bayesian_data)
 task4_y <- task4_bayesian_data$flop
 
-<<<<<<< Updated upstream
+
 task4_prior_sd <- rep(1.5, ncol(task4_X))
 names(task4_prior_sd) <- colnames(task4_X)
 
@@ -1412,23 +1399,19 @@ task4_prior_sd["(Intercept)"] <- 1
 task4_prior_sd["budget_z"] <- 0.5
 task4_prior_sd["crew_z"] <- 0.5
 
-=======
 # Normal priors: intercept N(-1, 1); genre and franchise N(0, 1.5); standardised budget and crew N(0, 0.5)
 task4_prior_sd <- rep(1.5, ncol(task4_X))
 names(task4_prior_sd) <- colnames(task4_X)
 task4_prior_sd[c("(Intercept)", "budget_z", "crew_z")] <- c(1, 0.5, 0.5)
->>>>>>> Stashed changes
 task4_prior_mean <- rep(0, ncol(task4_X))
 names(task4_prior_mean) <- colnames(task4_X)
 task4_prior_mean["(Intercept)"] <- -1
 
-<<<<<<< Updated upstream
-=======
 # Log-posterior = numerically stable Bernoulli log-likelihood + log-prior
->>>>>>> Stashed changes
+
 task4_log_posterior <- function(beta) {
   eta <- drop(task4_X %*% beta)
-<<<<<<< Updated upstream
+
 
   log_likelihood <- sum(
     task4_y * eta -
@@ -1444,10 +1427,9 @@ task4_log_posterior <- function(beta) {
     )
   )
 
-=======
+
   log_likelihood <- sum(task4_y * eta - (pmax(eta, 0) + log1p(exp(-abs(eta)))))
   log_prior <- sum(dnorm(beta, mean = task4_prior_mean, sd = task4_prior_sd, log = TRUE))
->>>>>>> Stashed changes
   log_likelihood + log_prior
 }
 ```
@@ -1498,7 +1480,6 @@ quantile(
 
 ```{r}
 #| label: task4-bayesian-fit
-<<<<<<< Updated upstream
 #| include: false
 
 task4_mode <- optim(
@@ -1508,24 +1489,21 @@ task4_mode <- optim(
   hessian = TRUE,
   control = list(maxit = 2000)
 )
-=======
 #| echo: !expr c(1, 3:6, 8)
 #| results: hide
->>>>>>> Stashed changes
 
 # Posterior mode as the starting point; inverse Hessian as the proposal covariance
 task4_mode <- optim(par = task4_prior_mean, fn = function(beta) -task4_log_posterior(beta),
                     method = "BFGS", hessian = TRUE, control = list(maxit = 2000))
 print(task4_mode$convergence)
-<<<<<<< Updated upstream
+
 
 task4_proposal_cov <- solve(task4_mode$hessian)
 
-=======
+
 task4_proposal_cov <- solve(task4_mode$hessian)
 
 # Four Metropolis-Hastings chains: 4,000 burn-in and 12,000 kept draws each
->>>>>>> Stashed changes
 set.seed(2420)
 task4_mh_chains <- lapply(1:4, function(chain) {
   starting_values <- as.numeric(MASS::mvrnorm(1, mu = task4_mode$par, Sigma = task4_proposal_cov))
@@ -1538,10 +1516,7 @@ task4_mh_chains <- lapply(1:4, function(chain) {
 })
 task4_mh_chains <- do.call(coda::mcmc.list, task4_mh_chains)
 saveRDS(task4_mh_chains, "task4_mh_fit.rds")
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
 task4_mh_draws <- as.matrix(task4_mh_chains)
 ```
 
@@ -1897,7 +1872,6 @@ print(task4_pitches)
 #| echo: !expr 1:3
 #| results: hide
 
-<<<<<<< Updated upstream
 task4_pitch_X <- model.matrix(
   ~ primary_genre + franchise_status + budget_z + crew_z,
   data = task4_pitches
@@ -1908,12 +1882,11 @@ task4_pitch_X <- task4_pitch_X[, colnames(task4_mh_draws), drop = FALSE]
 task4_pitch_prob_draws <- plogis(
   task4_mh_draws %*% t(task4_pitch_X)
 )
-=======
+
 task4_pitch_X <- model.matrix(~ primary_genre + franchise_status + budget_z + crew_z, data = task4_pitches)
 task4_pitch_X <- task4_pitch_X[, colnames(task4_mh_draws), drop = FALSE]  # same columns as the model
 # Flop probability for every posterior draw and pitch (summarised by median and 95% CrI below)
 task4_pitch_prob_draws <- plogis(task4_mh_draws %*% t(task4_pitch_X))
->>>>>>> Stashed changes
 
 task4_pitch_results <- data.frame(
   Pitch = task4_pitches$Pitch,
