@@ -1,17 +1,19 @@
 ---
 title: "Meridian Pictures: Strategy and Slate Planning"
-subtitle: "ETC2420/5242 Group Assignment 2"
-author: "Group 025 — Joshua Bannon, Vikash Manoj, Shakshi Shah, Smit Tambat"
-date: "23 October 2026"
+subtitle: "ETC2420/5242 | Group 025 | Assignment 2"
+author: "Joshua Bannon, Vikash Manoj, Shakshi Shah, Smit Tambat"
 format:
   pdf:
     toc: true
+    toc-depth: 2
     number-sections: true
 execute:
   warning: false
   message: false
   echo: false
 ---
+
+{{< pagebreak >}}
 
 # Task 1: Slate Health Check
 
@@ -63,7 +65,7 @@ franchise_summary <- movies_clean |>
   )
 ```
 
-## Data Preparation and quality
+## (a) Financial and Slate Summary
 
 The course-provided dataset is based on The Movie Database [@tmdb]. Films released after 2016 are excluded, while budgets below $10,000 and zero revenues are treated as missing. ROI is recalculated as revenue divided by production budget. For genre comparisons, films are classified using their first-listed genre to prevent double-counting.
 
@@ -144,7 +146,7 @@ knitr::kable(
 
 Of 4,801 films in the analysis period, 1,070 have an invalid or missing budget, 1,425 have missing revenue and 1,587 have missing ROI. Financial results therefore reflect only films with usable values. The median budget is **$24 million** and median ROI is **2.30**; medians are more informative than means because a few films have unusually large values.
 
-## Overall Distributions
+## (b) Distributions and Genre Comparisons
 
 ```{r}
 #| label: fig-overall
@@ -218,7 +220,7 @@ p3 <- ggplot(
 
 Budgets are right-skewed, with most films concentrated at the lower end. ROI is also highly skewed, so it is displayed on a log scale; the dashed line marks revenue equal to budget (ROI = 1). **Original films make up 94.6%** of the dataset, compared with **5.4% franchises**.
 
-## Differences Across Genres
+### Comparisons Across Genres
 
 ```{r}
 #| label: fig-genres
@@ -300,7 +302,7 @@ p6 <- ggplot(
 
 Animation and action generally have higher production budgets, while horror and drama tend to be lower-budget. ROI overlaps substantially across genres, suggesting that a larger budget does not guarantee a greater revenue-to-budget multiple. Franchise shares also vary by genre, although original films dominate all five groups.
 
-## Changes over time
+## (c) Changes Over Time
 
 ```{r}
 #| label: fig-trends
@@ -397,7 +399,7 @@ p9 <- ggplot(
 
 Between 1990 and 2016, median production budgets fluctuate without a consistent upward trend. Median ROI also varies considerably across release years but generally remains above one, indicating that reported box-office revenues typically exceed production budgets. Original productions dominate the slate throughout the period, although the proportion of franchises changes between years. These patterns suggest that production costs and returns vary over time, without establishing a consistent shift towards franchises.
 
-## Summary for the Head of Production
+## (d) Head of Production Summary
 
 The dataset is dominated by original films, with relatively few franchises. Typical production budgets are well below the largest blockbuster budgets, while ROI varies considerably between films. This makes the median more useful than the mean for describing a typical project.
 
@@ -405,9 +407,9 @@ Production scale differs across genres: action and animation tend to need larger
 
 Finally, missing financial values are substantial: only **3,214 films** have both a valid budget and ROI. Comparisons should be viewed as exploratory, especially because box-office revenue is not the same as studio profit and ROI here does not deduct marketing or distribution costs.
 
-# Task 2: Franchise vs. Original: Investment Strategy
+{{< pagebreak >}}
 
-## Introduction
+# Task 2: Franchise vs. Original: Investment Strategy
 
 Meridian Pictures must decide how to balance investment between Original films and Franchise films. This analysis compares their production budget distributions, estimates the difference in median budgets, and considers what the evidence implies for future investment decisions.
 
@@ -456,7 +458,7 @@ movies_clean <- movies |>
   )
 ```
 
-## Budget Distribution Comparison
+## (a) Budget Distributions
 
 ```{r}
 #| label: fig-task2-budget-comparison
@@ -521,7 +523,7 @@ budget_summary |>
   )
 ```
 
-## Interval Estimation
+## (b) Median Budget Difference: 95% Interval
 
 ```{r}
 #| label: task2-bootstrap-data
@@ -626,7 +628,7 @@ revenue_summary |>
   )
 ```
 
-## Discussion
+## (c) Assessment of Leadership’s Concern
 
 The findings partially support leadership's concern about the allocation of production budgets. Franchise films had a median budget of \$40 million, compared with \$22 million for Original films, and the 95% bootstrap confidence interval for the difference in medians (Franchise minus Original) was approximately \$9.00 million to \$25.03 million. As this interval lies entirely above zero, the results support a higher median budget for Franchise films. However, the budget distributions overlap, so not all Original films have smaller budgets than Franchise films.
 
@@ -634,11 +636,13 @@ The revenue results do not support the concern that Franchise films generate the
 
 These revenue figures do not account for production or marketing costs and therefore cannot establish which group is more profitable.
 
-## Investment Strategy Recommendations
+## (d) Investment Strategy
 
 Meridian should gradually increase its investment in Original films while maintaining a core portfolio of established franchises. Rather than allocating budgets based solely on whether a project belongs to a franchise, the studio should assess each film according to its expected financial returns, production costs, commercial potential and contribution to creative diversity. Original projects could be developed through a range of budget levels, allowing Meridian to explore new concepts without committing substantial resources to every untested idea.
 
 Over the next decade, Meridian should evaluate the performance of both categories using profitability and return on investment, rather than revenue alone. It should also monitor the financial performance of new Original projects over time and adjust its investment allocations as evidence accumulates. This approach would allow the studio to pursue its creative-diversity goals while retaining established franchises as part of its investment portfolio. The available analysis does not establish an optimal budget allocation between the two categories, so Meridian should use ongoing performance reviews to guide future decisions rather than commit to a fixed proportion in advance.
+
+{{< pagebreak >}}
 
 # Task 3: Modelling Budgets and Downside Risk
 
@@ -657,10 +661,10 @@ knitr::opts_chunk$set(echo = knitr::is_html_output())
 movies <- read_csv("data/movies.csv")
 ```
 
-## Introduction
+
 Meridian's Finance team needs two inputs for planning: a realistic probability model for production budgets, benchmarked against Universal Pictures, for its budget simulator; and a downside-risk figure for Action, its most capital-intensive genre. Downside risk is the 25th percentile of ROI (worldwide box-office revenue divided by production budget), the multiple below which the worst quarter of Action films fall.
 
-## Universal Pictures Budget Modelling
+## (a) Universal Budget Distributions
 We used the 243 Universal Pictures films (by `primary_company`) released up to 2016 with a valid budget, treating budgets under \$10,000 as missing-data placeholders. Budgets (in \$m) are strongly right-skewed: the middle half lie between \$17m and \$60.5m, but a few exceed \$150m, pulling the mean (\$44.5m) well above the median (\$35m). Alongside the required normal distribution, we fitted gamma, log-normal and Weibull distributions, which take only positive values and allow for right skew, all by maximum likelihood using `fitdistr()` from the MASS package.
 
 ```{r}
@@ -719,7 +723,7 @@ universal_weibull <- fitdistr(
 ```
 
 
-## Model Diagnostics and Comparison
+### Fit Diagnostics and AIC
 
 ```{r}
 #| label: tbl-task3-aic
@@ -871,7 +875,7 @@ qq_weibull <-
 qq_normal + qq_gamma + qq_lognormal + qq_weibull
 ```
 
-## Action Genre Downside Risk
+## (b) Action Downside Risk and Intervals
 For downside risk we used all studios: the 588 films with Action as their primary genre, released up to 2016, with a valid budget and positive revenue (zero revenue is also a placeholder). The sample 25th percentile of ROI is 0.91 (@tbl-task3-q25), so a quarter of Action films returned less than 91 cents of box office for every dollar of budget.
 ```{r}
 #| label: task3-action-data
@@ -1017,7 +1021,7 @@ action_comparison |>
   )
 ```
 
-## Comparison of Interval Estimates
+## (c) Comparing the Estimators
 
 ```{r}
 #| label: fig-task3-action
@@ -1032,19 +1036,19 @@ boot_q25_plot + action_qq_plot
 The two methods do not agree (@tbl-task3-q25): the bootstrap gives 0.91 (95% interval 0.80 to 1.05) and the model gives 0.73 (0.66 to 0.82). The intervals barely overlap, and the model's interval excludes the sample estimate. The most likely cause is the log-normal assumption. In the right panel of @fig-task3-action, the lowest points fall well below the line, so the worst Action flops lost far more of their budget than a log-normal would predict. These extremes drag meanlog down (0.48, against a median log ROI of 0.68) and inflate sdlog, pulling the model's 25th percentile below what the films show; its narrower interval reflects trust in that shape, not extra information. A percentile is unaffected by how extreme the worst values are, so with 588 films and a bootstrap distribution centred on the estimate (left panel), we prefer the bootstrap interval. 
 Two caveats apply: the bootstrap distribution is lumpy, as is usual for a percentile, and some of the worst flops may be revenue reporting errors; correcting those could only raise the 25th percentile, so 0.91 errs on the cautious side.
 
-## Summary for the Finance Team
+## (d) Finance Team Summary
 
 **Budget model.** We recommend the simulator use a gamma distribution with shape 1.382 and rate 0.031 per \$m. Of four shapes tested on 243 Universal films, using a model-comparison score (AIC) and visual checks, it fits best, including the few very expensive films, and it matches the average budget of about \$44.5m. A normal (bell-shaped) curve would even generate negative budgets.
 
 **Action downside risk.** Plan around an ROI of 0.91. Historically, one in four Action films earned less than 91 cents at the box office per dollar of budget, so roughly two of the eight contracted Action releases could fall below that level. The plausible range is 0.80 to 1.05, so use 0.80 for cautious stress tests. This figure comes from resampling the actual films; a fitted curve (0.73) did not match the worst results. ROI counts self-reported box office only, with no marketing costs, and budgets are not adjusted for inflation.
 
+{{< pagebreak >}}
+
 # Task 4: Building a Greenlight Risk Model
 
-## Introduction
+Using genre, franchise status, budget and crew size known before approval, we model the probability that a film fails to recover its production budget and assess three proposed films.
 
-This analysis examines whether information available before production can help Meridian identify films at risk of failing to recover their budgets. Frequentist and Bayesian logistic regression models were fitted using genre, franchise status, budget and crew size. The results are used to assess classification performance and estimate financial risk for three hypothetical film proposals.
-
-## Outcome and Predictor Definitions
+## (a) Flop Definition and Model Choice
 
 ```{r}
 #| label: task4-outcome
@@ -1094,15 +1098,9 @@ task4_data |>
   )
 ```
 
-Financial risk was assessed using return on investment (ROI), calculated as box-office revenue divided by production budget. A film was classified as a *flop* when its ROI was below 1, indicating that reported revenue did not recover the production budget. Films with an ROI of 1 or higher were classified as *non-flops*, while those with missing ROI were left unclassified.
+A *flop* has ROI (box-office revenue divided by production budget) below 1; missing ROI is unclassified. Of 4,801 films, 785 were flops, 2,429 non-flops and 1,587 lacked valid financial data. The observed flop rate among 3,214 classified films was 24.4%. We use logistic regression because it models a binary outcome and returns probabilities between zero and one, unlike unrestricted linear predictions; Poisson regression instead targets counts. Genre, franchise status, budget and crew size were available for 3,213 complete cases. Missing financial data may bias the sample.
 
-Of the 4,801 films examined, 785 were identified as flops and 2,429 as non-flops, with the remaining 1,587 lacking sufficient financial information for classification. Among the 3,214 films with known outcomes, the observed flop rate was approximately 24.4%.
-
-Logistic regression was selected because the outcome is binary, allowing the model to estimate the probability of a film flopping while keeping predicted values between 0 and 1. Linear regression is less appropriate because its predictions are not restricted to this range, whereas Poisson regression is primarily designed for count outcomes rather than binary classifications.
-
-The proposed predictors were primary genre, franchise status, production budget and crew size, as these characteristics can reasonably be considered before a film receives production approval. After accounting for missing outcome and predictor information, 3,213 films had complete observations available for modelling. However, the substantial amount of missing financial data remains an important limitation, as films with recorded outcomes may not be representative of the wider dataset, potentially introducing selection bias.
-
-## Frequentist Logistic Regression
+## (b) Frequentist and Bayesian Logistic Models
 
 ```{r}
 #| label: task4-initial-model
@@ -1232,9 +1230,9 @@ The frequentist logistic regression was fitted using 3,213 films with complete i
 
 **Limitations**
 
-The model has two important limitations. First, the Foreign genre contained only one film with a known outcome, which was a flop. This resulted in complete separation and an unstable coefficient, making its estimated odds ratio unreliable. Second, the analysis used 3,213 of the original 4,801 films because observations with missing information were excluded. If missing financial data are not random, the estimated relationships may not represent all films. These limitations should be considered when interpreting the results and comparing them with the Bayesian model.
+Interpret these associations cautiously: the Foreign genre has only one classified film, causing complete separation and an unstable frequentist estimate. In addition, only 3,213 of 4,801 films were usable; non-random missing data could bias the results.
 
-## Bayesian Logistic Regression
+### Bayesian Model and Diagnostics
 
 ```{r}
 #| label: task4-bayesian-data-checks
@@ -1606,13 +1604,9 @@ task4_bayesian_results |>
 
 **Bayesian findings and limitations**
 
-The Bayesian logistic regression was estimated using four Metropolis–Hastings chains. The acceptance rates were approximately 35.5%–36.6%, with a minimum effective sample size of 522.1 and a maximum upper R-hat of 1.012. These diagnostics suggest that the chains mixed reasonably well and produced sufficiently consistent estimates for the main analysis.
+The Bayesian model used four Metropolis–Hastings chains (acceptance 35.5%–36.6%; minimum effective sample size 522.1; maximum upper R-hat 1.012), with broadly similar effects to the frequentist model. The sparsely observed Foreign genre remains highly uncertain despite prior regularisation (95% credible interval for its coefficient: −1.186 to 3.413).
 
-The Bayesian results were broadly consistent with the frequentist model. Franchise films had lower estimated flop odds than original films, while higher budgets and larger crews were also associated with lower flop odds. These are associations rather than evidence of causation.
-
-The Foreign genre requires particular caution. Only one film in this category had a known outcome, making its estimated effect highly uncertain. Its posterior median coefficient was 0.939, with a 95% credible interval from −1.186 to 3.413 on the log-odds scale. Since this interval includes zero, there is insufficient evidence to determine whether this genre has higher or lower flop odds than the reference genre. The Bayesian prior helped stabilise the estimate, but it cannot compensate for the lack of observations.
-
-## Model Comparison
+### Odds Ratios and Uncertainty Comparison
 
 ```{r}
 #| label: task4-model-comparison-data
@@ -1704,13 +1698,9 @@ prob_franchise_negative <- mean(franchise_draws < 0)
 print(prob_franchise_negative)
 ```
 
-The frequentist and Bayesian logistic regression models produced closely aligned results. Franchise films had lower estimated odds of flopping than original films, with a frequentist odds ratio of 0.224 (95% CI: 0.126–0.399) and a Bayesian odds ratio of 0.238 (95% CrI: 0.132–0.390). Budget and crew size also showed similar negative associations with flop odds across both models.
+The models agree that franchise films have lower flop odds: frequentist OR 0.224 (95% CI 0.126–0.399) and Bayesian OR 0.238 (95% CrI 0.132–0.390). Budget and crew effects are likewise consistent (see @tbl-task4-model-comparison). A confidence interval has a long-run coverage interpretation; a credible interval represents posterior uncertainty conditional on the model and priors. More than 99.9% of posterior draws imply lower odds for franchises, but these are associations, not causal effects.
 
-Although the intervals are numerically similar, their interpretations differ. A frequentist 95% confidence interval describes the long-run coverage of the estimation method, whereas a Bayesian 95% credible interval describes uncertainty about the parameter given the data, model and priors.
-
-All retained Metropolis–Hastings samples for the franchise coefficient were negative, giving an estimated posterior probability above 99.9% that franchise status is associated with lower flop odds after accounting for genre, budget and crew size. However, neither approach establishes a causal relationship.
-
-## Classification Performance
+## (c) Classification Performance
 
 ```{r}
 #| label: task4-classification-predictions
@@ -1873,15 +1863,9 @@ knitr::kable(
 
 **Classification performance**
 
-At the standard 50% threshold, the model achieved 75.6% accuracy but identified only 5 of the 784 actual flops, giving a sensitivity of just 0.6%. Since flops represented approximately 24.4% of the modelling sample, predicting most films as non-flops produced a misleadingly high accuracy.
+At the 50% classification threshold, accuracy was 75.6% but sensitivity just 0.6% (5 of 784 flops detected). Because flops comprise only about 24.4% of classified films, accuracy alone is misleading. Lowering the threshold to 30% increases sensitivity to 43.1% (338 flops), with 74.2% specificity, 35.0% precision and 66.6% accuracy (@tbl-task4-classification-performance). The 627 false alarms make this a *review flag*, not an automatic rejection rule. These in-sample estimates may overstate performance on new films.
 
-A 30% threshold was therefore considered more suitable for identifying financial risk. It increased sensitivity to 43.1%, correctly identifying 338 flops, although specificity decreased to 74.2% and precision was 35.0%. Overall accuracy fell to 66.6%.
-
-For Meridian, identifying potentially unsuccessful productions before approval may be more valuable than maximising accuracy alone. However, the lower threshold also incorrectly flagged 627 non-flops, meaning these predictions should support further review rather than automatic rejection. The 30% threshold is a practical illustration of this trade-off, not a statistically proven optimum.
-
-These results are based on the films used to fit the model and may overstate performance on future productions.
-
-## Hypothetical Film Pitches
+## (d) Pitch Recommendations and Summary
 
 ```{r}
 #| label: task4-hypothetical-pitches
@@ -1972,58 +1956,29 @@ task4_pitch_display <- task4_pitch_results |>
 knitr::kable(task4_pitch_display, row.names = FALSE)
 ```
 
-### Greenlight recommendations
+### Recommendations for Three Pitches
 
 **The Meridian Protocol: Black Tide — Conditional greenlight**
 
-This franchise action film has the lowest predicted flop probability at 4.7% (95% credible interval: 2.7%–7.9%). Although the estimated risk is relatively low, the proposed $85 million budget represents a substantial financial commitment. Meridian could move the project forward, provided the production budget and expected revenue are reviewed before final approval.
+Lowest estimated risk: 4.7% (95% CrI 2.7%–7.9%). Conditional approval is reasonable, subject to checking the proposed $85 million budget and revenue forecasts.
 
 **Platform Zero — Conditional greenlight**
 
-With a predicted flop probability of 16.0% (95% credible interval: 11.2%–22.2%), this original horror film presents a moderate level of risk compared with the other two pitches. Its $9 million budget makes it a smaller financial commitment. A conditional greenlight would allow Meridian to explore the project further while checking whether its expected audience and distribution plans support the investment.
+Estimated flop risk is 16.0% (95% CrI 11.2%–22.2%). Consider conditional approval of this $9 million horror film after audience and distribution review.
 
 **The Things We Never Recorded — Hold for further review**
 
-This original drama has the highest predicted flop probability at 28.8% (95% credible interval: 25.6%–32.6%). Given its proposed $18 million budget, approving the project without further financial assessment would be difficult to justify. Meridian could review the budget, intended audience and distribution strategy before reconsidering the proposal.
+Highest estimated risk: 28.8% (95% CrI 25.6%–32.6%). Hold the $18 million drama until its budget, audience and distribution assumptions are reassessed.
 
 These recommendations are based on estimated flop risk rather than guaranteed outcomes. A lower predicted probability does not necessarily mean a project offers a better financial return.
 
-## Summary for the Head of Production
+### Plain-Language Takeaway
 
-The greenlight model provides Meridian with an early assessment of a film's financial risk using information available before production begins. By considering genre, franchise status, budget and crew size, it estimates the likelihood of a film failing to recover its production budget.
+For the Head of Production, the model is an early-warning tool, not a greenlight decision-maker. It favours *Black Tide*, then *Platform Zero*, while *The Things We Never Recorded* needs further review. Estimates omit marketing, audience demand and release strategy, measure flop probability rather than loss size, and have not been validated on new films. Use them alongside financial forecasts and professional judgement.
 
-Among the three proposed films, *The Meridian Protocol: Black Tide* has the lowest estimated flop risk, followed by *Platform Zero*. *The Things We Never Recorded* presents the greatest concern and would benefit from further review before approval.
+{{< pagebreak >}}
 
-However, the model has important limitations. Its predictions rely on historical films with sufficient financial information and do not capture factors such as audience demand, marketing, release timing or distribution arrangements. The model also estimates the chance of a flop, not the amount of money a studio might lose. Its classification results were assessed using the same films on which it was trained, so performance on future productions remains uncertain.
+# Appendix: 
 
-Meridian should therefore use these estimates as an early warning tool rather than a final decision-maker. Combining the model's findings with financial forecasts and professional judgement would provide a more balanced basis for greenlight decisions.
+EXCEL SPREADHSEET LINK (ALLOCATION FEEDBACK AND MEETINGS AND A.I DECLARATION)
 
-
-# Appendix: Group Collaboration
-
-## Group Information
-
-**Team 025**
-
-**Group Members**
-
-- Joshua Bannon
-- Vikash Manoj
-- Shakshi Shah
-- Smit Tambat
-
-## Task Allocation
-
-[Insert task allocation and reviewer table.]
-
-## Meeting Schedule
-
-[Record meeting dates, participants and objectives.]
-
-## Contribution Summary
-
-[Document each member's contributions.]
-
-## Cross-Review
-
-[Record reviewers and feedback for each task.]
