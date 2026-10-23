@@ -198,25 +198,29 @@ p2 <- ggplot(
 
 p3 <- ggplot(
   franchise_summary,
-  aes(x = franchise_status,
+  aes(x = "",
       y = Films,
       fill = franchise_status)
 ) +
-  geom_col(width = 0.65) +
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
   geom_text(
-    aes(label = paste0(Percentage, "%")),
-    vjust = -0.5
+    aes(label = paste0(Films, " films\n", Percentage, "%")),
+    position = position_stack(vjust = 0.5),
+    colour = "white",
+    size = 4
   ) +
   scale_fill_manual(
     values = c("Original" = "#3478A8",
                "Franchise" = "#E59B46")
   ) +
   labs(
-    x = "Film type",
-    y = "Number of films"
+    fill = "Film type"
   ) +
-  guides(fill = "none") +
-  expand_limits(y = max(franchise_summary$Films) * 1.1)
+  theme_void() +
+  theme(
+    legend.position = "bottom"
+  )
 
 (p1 + p2 + p3)
 ```
@@ -1098,18 +1102,16 @@ Using genre, franchise status, budget and crew size known before approval, we mo
 #| label: task4-outcome
 #| include: false
 
-# movies_clean was created in the shared setup chunk.
 
 task4_data <- movies_clean |>
   mutate(
     flop = case_when(
       is.na(roi) ~ NA_integer_,
       roi < 1 ~ 1L,
-      TRUE ~ 0L      
+      TRUE ~ 0L
     )
   )
 
-# Check the outcome categories.
 task4_data |>
   count(flop, name = "number_of_films")
 ```
@@ -1118,7 +1120,6 @@ task4_data |>
 #| label: task4-data-checks
 #| include: false
 
-# Check missing values in the selected predictors.
 task4_data |>
   summarise(
     missing_genre = sum(is.na(primary_genre)),
@@ -1127,7 +1128,6 @@ task4_data |>
     missing_crew = sum(is.na(crew_size))
   )
 
-# Count films with complete information for modelling.
 task4_data |>
   summarise(
     complete_model_cases = sum(
@@ -1282,12 +1282,10 @@ Interpret these associations cautiously: the Foreign genre has only one classifi
 #| label: task4-bayesian-data-checks
 #| include: false
 
-# Outcome balance
 task4_model_data |>
   dplyr::count(flop) |>
   dplyr::mutate(proportion = n / sum(n))
 
-# Number of flops and non-flops in each genre
 task4_model_data |>
   dplyr::group_by(primary_genre) |>
   dplyr::summarise(
@@ -1298,7 +1296,6 @@ task4_model_data |>
   ) |>
   dplyr::arrange(films)
 
-# Predictor scales
 task4_model_data |>
   dplyr::summarise(
     budget_sd = sd(budget_10m),
@@ -1337,21 +1334,17 @@ summary(task4_bayesian_data[, c("budget_z", "crew_z")])
 
 set.seed(2420)
 
-# Draw hypothetical coefficients from proposed priors
 prior_intercept <- 2.5 * rt(10000, df = 3)
 prior_franchise <- rnorm(10000, mean = 0, sd = 1.5)
 prior_budget <- rnorm(10000, mean = 0, sd = 0.5)
 prior_crew <- rnorm(10000, mean = 0, sd = 0.5)
 
-# Illustrative profile: original film with average budget and crew
 prior_prob_original <- plogis(prior_intercept)
 
-# Illustrative profile: franchise film with average budget and crew
 prior_prob_franchise <- plogis(
   prior_intercept + prior_franchise
 )
 
-# Summarise implied prior probabilities
 rbind(
   Original = quantile(
     prior_prob_original,
@@ -1372,16 +1365,13 @@ set.seed(2420)
 
 n_draws <- 10000
 
-# Candidate intercept priors
 intercept_a <- 2.5 * rt(n_draws, df = 3)
 intercept_b <- rnorm(n_draws, mean = -1, sd = 1)
 
-# Other coefficient priors
 franchise_effect <- rnorm(n_draws, 0, 1.5)
 budget_effect <- rnorm(n_draws, 0, 0.5)
 crew_effect <- rnorm(n_draws, 0, 0.5)
 
-# Representative profiles on standardised scales
 prior_profiles <- data.frame(
   profile = c(
     "Original, average scale",
@@ -1393,7 +1383,6 @@ prior_profiles <- data.frame(
   crew_z = c(0, 0, 1)
 )
 
-# Function to summarise implied probabilities
 check_prior <- function(intercept, prior_name) {
 
   results <- lapply(
@@ -1432,7 +1421,6 @@ print(prior_comparison)
 #| label: task4-bayesian-final-priors
 #| include: false
 
-# Design matrix for Bayesian logistic regression
 task4_formula <- flop ~ primary_genre + franchise_status +
   budget_z + crew_z
 
@@ -1443,7 +1431,6 @@ task4_X <- model.matrix(
 
 task4_y <- task4_bayesian_data$flop
 
-# Prior standard deviations for regression coefficients
 task4_prior_sd <- rep(1.5, ncol(task4_X))
 names(task4_prior_sd) <- colnames(task4_X)
 
@@ -1451,18 +1438,15 @@ task4_prior_sd["(Intercept)"] <- 1
 task4_prior_sd["budget_z"] <- 0.5
 task4_prior_sd["crew_z"] <- 0.5
 
-# Prior means
 task4_prior_mean <- rep(0, ncol(task4_X))
 names(task4_prior_mean) <- colnames(task4_X)
 
 task4_prior_mean["(Intercept)"] <- -1
 
-# Log-posterior = log-likelihood + log-prior
 task4_log_posterior <- function(beta) {
 
   eta <- drop(task4_X %*% beta)
 
-  # Numerically stable Bernoulli log-likelihood
   log_likelihood <- sum(
     task4_y * eta -
       (pmax(eta, 0) + log1p(exp(-abs(eta))))
@@ -1502,12 +1486,10 @@ task4_prior_fit <- brms::brm(
   file = "task4_prior_predictive_fit"
 )
 
-# Prior-predictive probabilities for all modelled films
 prior_probabilities <- brms::posterior_epred(
   task4_prior_fit
 )
 
-# Distribution of the average implied flop probability
 prior_average_risk <- rowMeans(prior_probabilities)
 
 quantile(
@@ -1515,7 +1497,6 @@ quantile(
   c(0.025, 0.5, 0.975)
 )
 
-# Simulated number of flops in the modelling sample
 prior_simulated_outcomes <- brms::posterior_predict(
   task4_prior_fit
 )
@@ -1532,7 +1513,6 @@ quantile(
 #| label: task4-bayesian-fit
 #| include: false
 
-# Locate a suitable starting point for Metropolis sampling
 task4_mode <- optim(
   par = task4_prior_mean,
   fn = function(beta) -task4_log_posterior(beta),
@@ -1543,10 +1523,8 @@ task4_mode <- optim(
 
 print(task4_mode$convergence)
 
-# Estimate the proposal covariance
 task4_proposal_cov <- solve(task4_mode$hessian)
 
-# Run four Metropolis-Hastings chains
 set.seed(2420)
 
 task4_mh_chains <- lapply(1:4, function(chain) {
@@ -1582,7 +1560,6 @@ task4_mh_chains <- do.call(
 )
 saveRDS(task4_mh_chains, "task4_mh_fit.rds")
 
-# Combine the four chains into a matrix of posterior draws
 task4_mh_draws <- as.matrix(task4_mh_chains)
 ```
 
@@ -1590,13 +1567,11 @@ task4_mh_draws <- as.matrix(task4_mh_chains)
 #| label: task4-bayesian-diagnostics
 #| include: false
 
-# Check agreement between the four chains
 task4_rhat <- coda::gelman.diag(
   task4_mh_chains,
   multivariate = FALSE
 )
 
-# Check effective sample sizes
 task4_ess <- coda::effectiveSize(task4_mh_chains)
 
 print(task4_rhat)
@@ -1656,7 +1631,6 @@ The Bayesian model used four Metropolis–Hastings chains (acceptance 35.5%–36
 #| label: task4-model-comparison-data
 #| include: false
 
-# Frequentist estimates
 frequentist_coefs <- coef(task4_frequentist)
 frequentist_ci <- confint.default(task4_frequentist)
 
@@ -1667,7 +1641,6 @@ predictors <- c(
 )
 
 
-# Convert Bayesian coefficients to comparable odds ratios
 bayesian_or_draws <- cbind(
   Franchise = exp(
     task4_mh_draws[, "franchise_statusFranchise"]
@@ -1680,7 +1653,6 @@ bayesian_or_draws <- cbind(
   )
 )
 
-# Summarise posterior odds ratios
 bayesian_medians <- apply(bayesian_or_draws, 2, median)
 bayesian_lower <- apply(bayesian_or_draws, 2, quantile, 0.025)
 bayesian_upper <- apply(bayesian_or_draws, 2, quantile, 0.975)
@@ -1734,7 +1706,6 @@ knitr::kable(
 #| label: task4-posterior-probability
 #| include: false
 
-# Posterior probability that franchise status reduces flop odds
 franchise_draws <- task4_mh_draws[, "franchise_statusFranchise"]
 
 prob_franchise_negative <- mean(franchise_draws < 0)
@@ -1750,21 +1721,18 @@ The models agree that franchise films have lower flop odds: frequentist OR 0.224
 #| label: task4-classification-predictions
 #| include: false
 
-# Predict flop probabilities using the frequentist model
 task4_predicted_prob <- predict(
   task4_frequentist,
   newdata = task4_model_data,
   type = "response"
 )
 
-# Classify films using a 50% probability threshold
 task4_predicted_class <- ifelse(
   task4_predicted_prob >= 0.5,
   1L,
   0L
 )
 
-# Compare predicted and actual outcomes
 task4_confusion <- table(
   Actual = factor(task4_model_data$flop, levels = c(0, 1)),
   Predicted = factor(task4_predicted_class, levels = c(0, 1))
@@ -1777,13 +1745,11 @@ print(task4_confusion)
 #| label: task4-classification-metrics
 #| include: false
 
-# Extract the four confusion matrix counts
 task4_tn <- task4_confusion["0", "0"]
 task4_fp <- task4_confusion["0", "1"]
 task4_fn <- task4_confusion["1", "0"]
 task4_tp <- task4_confusion["1", "1"]
 
-# Calculate classification performance
 task4_accuracy <- (task4_tp + task4_tn) / sum(task4_confusion)
 
 task4_sensitivity <- task4_tp / (task4_tp + task4_fn)
@@ -1798,7 +1764,6 @@ task4_precision <- if (
   NA_real_
 }
 
-# Summarise performance
 task4_metrics <- data.frame(
   Metric = c(
     "Accuracy",
@@ -1821,7 +1786,6 @@ print(task4_metrics)
 #| label: task4-threshold-comparison
 #| include: false
 
-# Compare classification results at two probability thresholds
 task4_threshold_metrics <- function(threshold) {
 
   predicted <- ifelse(task4_predicted_prob >= threshold, 1L, 0L)
@@ -1927,7 +1891,6 @@ task4_pitches <- data.frame(
   crew_10 = c(2.4, 9, 3.8)
 )
 
-# Keep the same categories as the fitted model
 task4_pitches$primary_genre <- factor(
   task4_pitches$primary_genre,
   levels = sort(unique(task4_model_data$primary_genre))
@@ -1938,7 +1901,6 @@ task4_pitches$franchise_status <- factor(
   levels = levels(task4_model_data$franchise_status)
 )
 
-# Apply the standardisation used in the Bayesian model
 task4_pitches <- task4_pitches |>
   dplyr::mutate(
     budget_z = (budget_10m - task4_budget_mean) / task4_budget_sd,
@@ -1952,21 +1914,17 @@ print(task4_pitches)
 #| label: task4-pitch-predictions
 #| include: false
 
-# Build the predictor matrix using the fitted model's columns
 task4_pitch_X <- model.matrix(
   ~ primary_genre + franchise_status + budget_z + crew_z,
   data = task4_pitches
 )
 
-# Ensure the columns match the Bayesian model
 task4_pitch_X <- task4_pitch_X[, colnames(task4_mh_draws), drop = FALSE]
 
-# Predicted flop probability for every posterior draw and pitch
 task4_pitch_prob_draws <- plogis(
   task4_mh_draws %*% t(task4_pitch_X)
 )
 
-# Summarise the posterior probabilities
 task4_pitch_results <- data.frame(
   Pitch = task4_pitches$Pitch,
   Median_Probability = apply(task4_pitch_prob_draws, 2, median),
