@@ -2,12 +2,12 @@
 title: "Task 2: Franchise vs. Original: Investment Strategy"
 format:
   pdf:
-    toc: true
+    toc: false
     number-sections: true
-    code-fold: true
 execute:
   warning: false
   message: false
+  echo: false
 ---
 
 # Task 2: Franchise vs. Original: Investment Strategy
@@ -18,6 +18,8 @@ Meridian Pictures must decide how to balance investment between Original films a
 
 The analysis uses films released by the end of 2016. Films with missing release years and films released after 2016 were excluded. Budgets below \$10,000 and nonpositive revenue values were treated as missing, consistent with the dataset documentation. The comparison uses all films with valid budget information and a known franchise classification, rather than restricting the analysis to the five focus genres.
 
+Overall, Franchise films have higher median production budgets and higher median revenue per film than Original films. However, Original films account for a larger share of total reported revenue in this dataset. These findings suggest that Meridian should consider both budget allocation and financial performance when planning its future slate.
+
 ```{r}
 #| label: task2-setup
 #| include: false
@@ -25,7 +27,7 @@ The analysis uses films released by the end of 2016. Films with missing release 
 library(tidyverse)
 library(knitr)
 
-theme_set(theme_minimal(base_size = 11))
+theme_set(theme_minimal(base_size = 9))
 
 movies <- read_csv(
   "data/movies.csv",
@@ -95,7 +97,7 @@ ggplot(
   )
 ```
 
-The boxplots suggest that Franchise films generally have higher production budgets than Original films, as shown by the higher median budget. The Franchise group also has a wider interquartile range on the displayed logarithmic scale, indicating greater variation in the middle 50% of its budgets on a multiplicative scale. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in that group. However, the distributions overlap, so the difference is not absolute: some Original films have budgets comparable to those of Franchise films. These visual findings will be assessed further using a confidence interval for the difference in median budgets.
+The boxplots show that Franchise films generally have higher production budgets than Original films, as reflected in their higher median. Numerous low-budget outliers appear in the Original group, suggesting that very small-budget projects are more common in this category. However, the distributions overlap, so some Original films have budgets comparable to those of Franchise films. These visual findings are examined further using a confidence interval for the difference in median budgets.
 
 ```{r}
 #| label: task2-budget-summary
@@ -115,6 +117,9 @@ budget_summary <- movies_clean |>
 
 budget_summary |>
   gt::gt() |>
+  gt::tab_header(
+    title = "Median Production Budget by Film Classification"
+  ) |>
   gt::fmt_number(
     columns = median_budget_m,
     decimals = 2
@@ -184,13 +189,27 @@ bootstrap_ci <- bootstrap_results |>
     upper = quantile(boot_diff, probs = 0.975)
   )
 
-bootstrap_ci
+bootstrap_ci |>
+  gt::gt() |>
+  gt::tab_header(
+    title = "95% Bootstrap Interval for Median Budget Difference"
+  ) |>
+  gt::fmt_number(
+    columns = c(lower, upper),
+    decimals = 2
+  ) |>
+  gt::cols_label(
+    lower = "Lower ($m)",
+    upper = "Upper ($m)"
+  )
 ```
 
 To estimate the uncertainty in the difference between median production budgets, we used a bootstrap percentile method with 1,000 resamples. In each resample, budgets were sampled with replacement separately for Original and Franchise films, preserving the sample size of each group. The difference between the resampled medians was calculated as Franchise minus Original, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to obtain a 95% interval estimate. The resulting interval was approximately **\$9.00 million to \$25.03 million**, compared with an observed median budget difference of \$18 million. As the interval lies entirely above zero, the results provide evidence that Franchise films have a higher median production budget than Original films.
 
 ```{r}
 #| label: task2-revenue-summary
+#| fig-width: 6
+#| fig-height: 3.5
 
 revenue_summary <- movies_clean |>
   filter(
@@ -209,25 +228,44 @@ revenue_summary <- movies_clean |>
   )
 
 revenue_summary |>
+  mutate(
+    total_revenue_m = total_revenue / 1e6,
+    median_revenue_m = median_revenue / 1e6
+  ) |>
+  select(
+    franchise_status,
+    films_with_revenue,
+    total_revenue_m,
+    median_revenue_m,
+    revenue_share
+  ) |>
   gt::gt() |>
+  gt::tab_header(
+    title = "Revenue by film classification"
+  ) |>
   gt::fmt_number(
     columns = films_with_revenue,
     decimals = 0
   ) |>
   gt::fmt_number(
-    columns = c(total_revenue, median_revenue),
-    decimals = 0
+    columns = c(total_revenue_m, median_revenue_m),
+    decimals = 1
   ) |>
   gt::fmt_number(
     columns = revenue_share,
     decimals = 1
   ) |>
   gt::cols_label(
-    franchise_status = "Film classification",
-    films_with_revenue = "Films with reported revenue",
-    total_revenue = "Total revenue (USD)",
-    median_revenue = "Median revenue (USD)",
-    revenue_share = "Share of reported revenue (%)"
+    franchise_status = "Type",
+    films_with_revenue = "Films",
+    total_revenue_m = "Total revenue ($m)",
+    median_revenue_m = "Median revenue ($m)",
+    revenue_share = "Share (%)"
+  ) |>
+  gt::tab_options(
+    table.font.size = gt::px(8),
+    data_row.padding = gt::px(2),
+    heading.padding = gt::px(2)
   )
 ```
 
@@ -235,7 +273,7 @@ revenue_summary |>
 
 The findings partially support leadership's concern about the allocation of production budgets. Franchise films had a median budget of \$40 million, compared with \$22 million for Original films, and the 95% bootstrap confidence interval for the difference in medians (Franchise minus Original) was approximately \$9.00 million to \$25.03 million. As this interval lies entirely above zero, the results support a higher median budget for Franchise films. However, the budget distributions overlap, so not all Original films have smaller budgets than Franchise films.
 
-The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data. The unequal group sizes also affect the comparison of total revenue, while the greater concentration of revenue among the top five Franchise films suggests that the group total is more sensitive to a small number of high-performing films.
+The revenue results do not support the concern that Franchise films generate the majority of studio revenue in this dataset. Among films with reported revenue, Original films accounted for approximately 85.8% of total reported revenue (\$338.9 billion), while Franchise films accounted for 14.2% (\$56.2 billion). Nevertheless, Franchise films had a higher median revenue per film: approximately \$152.2 million, compared with \$47.8 million for Original films. This distinction suggests that the higher revenue typically earned by an individual Franchise film does not translate into a higher total revenue contribution from the Franchise group. These results should be interpreted in light of the unequal group sizes and the films with missing revenue data.
 
 These revenue figures do not account for production or marketing costs and therefore cannot establish which group is more profitable.
 
